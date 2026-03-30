@@ -51,7 +51,6 @@ yaniv/
 | Lobby | Game Setup | Invite Friends | GamePlay |
 | :---: | :---: | :---: | :---: |
 | ![Image 1](https://github.com/user-attachments/assets/739ec85d-ba4a-43fe-becf-db56cacbaa44) | ![Image 2](https://github.com/user-attachments/assets/50aff6dd-2360-4ef8-892f-b52baa0cc3a7) | ![Image 3](https://github.com/user-attachments/assets/739ec85d-ba4a-43fe-becf-db56cacbaa44) | ![Image 4](https://github.com/user-attachments/assets/36809a05-1ce9-4d67-992d-fdf82a45eb5b) |
-(https://github.com/user-attachments/assets/739ec85d-ba4a-43fe-becf-db56cacbaa44)
 ---
 
 ## 🎮 How to Run
