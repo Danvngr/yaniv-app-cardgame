@@ -1,24 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Modal, Image, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Globe, Bell, Music, Volume2, MessageCircle, LogOut, User } from 'lucide-react-native';
+import { ArrowRight, Globe, Bell, Music, Volume2, MessageCircle, LogOut } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useSound } from '../context/SoundContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { signOutUser, profile, updateProfile } = useAuth();
+  const { signOutUser } = useAuth();
   const { musicOn, setMusicOn, sfxOn, setSfxOn } = useSound();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language, setLanguage } = useLanguage();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  
-  // Display name
-  const [displayName, setDisplayName] = useState(profile?.username ?? '');
-  const [displayNameSaving, setDisplayNameSaving] = useState(false);
-  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
-  useEffect(() => {
-    setDisplayName(profile?.username ?? '');
-  }, [profile?.username]);
   
   // Settings states (not in SoundContext)
   const [notifications, setNotifications] = useState(true);
@@ -30,11 +23,6 @@ export default function SettingsScreen() {
     en: {
       title: 'Settings',
       general: 'General',
-      displayName: 'Display name',
-      displayNamePlaceholder: 'Your name',
-      saveName: 'Save',
-      nameSaved: 'Saved',
-      nameTaken: 'This name is already taken',
       notifications: 'Notifications',
       music: 'Music',
       sounds: 'Sound Effects',
@@ -49,11 +37,6 @@ export default function SettingsScreen() {
     he: {
       title: 'הגדרות',
       general: 'כללי',
-      displayName: 'שם תצוגה',
-      displayNamePlaceholder: 'השם שלך',
-      saveName: 'שמור',
-      nameSaved: 'נשמר',
-      nameTaken: 'שם זה תפוס',
       notifications: 'התראות',
       music: 'מוזיקה',
       sounds: 'צלילים',
@@ -68,22 +51,6 @@ export default function SettingsScreen() {
   };
 
   const t = text[language];
-
-  const handleSaveDisplayName = async () => {
-    const trimmed = displayName.trim();
-    if (!trimmed) return;
-    if (trimmed === profile?.username) return;
-    setDisplayNameError(null);
-    setDisplayNameSaving(true);
-    try {
-      await updateProfile({ username: trimmed });
-      setDisplayNameError(null);
-    } catch (err: any) {
-      setDisplayNameError(err?.message === 'username-taken' ? t.nameTaken : (err?.message || t.nameTaken));
-    } finally {
-      setDisplayNameSaving(false);
-    }
-  };
 
   const handleLogout = async () => {
     setShowLogoutModal(false);
@@ -120,30 +87,6 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, isRTL && { textAlign: 'right' }]}>{t.general}</Text>
           <View style={styles.settingsCard}>
-            <View style={[styles.settingRow, styles.displayNameRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <View style={[styles.settingLabelContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <User size={20} color="#8B7355" />
-                <Text style={styles.settingLabel}>{t.displayName}</Text>
-              </View>
-              <View style={styles.displayNameInputRow}>
-                <TextInput
-                  style={[styles.displayNameInput, isRTL && { textAlign: 'right' }]}
-                  value={displayName}
-                  onChangeText={(v) => { setDisplayName(v); setDisplayNameError(null); }}
-                  placeholder={t.displayNamePlaceholder}
-                  placeholderTextColor="rgba(245, 230, 211, 0.5)"
-                  editable={!displayNameSaving}
-                />
-                <Pressable
-                  onPress={handleSaveDisplayName}
-                  disabled={displayNameSaving || !displayName.trim() || displayName.trim() === profile?.username}
-                  style={[styles.displayNameSaveBtn, displayNameSaving && styles.displayNameSaveBtnDisabled]}
-                >
-                  {displayNameSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.displayNameSaveText}>{t.saveName}</Text>}
-                </Pressable>
-              </View>
-            </View>
-            {displayNameError ? <Text style={[styles.displayNameError, isRTL && { textAlign: 'right' }]}>{displayNameError}</Text> : null}
             <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.settingLabelContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Bell size={20} color="#8B7355" />
@@ -314,50 +257,6 @@ const styles = StyleSheet.create({
   },
   settingRowLast: {
     borderBottomWidth: 0,
-  },
-  displayNameRow: {
-    flexWrap: 'wrap',
-  },
-  displayNameInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    minWidth: 120,
-  },
-  displayNameInput: {
-    flex: 1,
-    backgroundColor: '#5C4A32',
-    borderWidth: 2,
-    borderColor: '#8B7355',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: '#F5E6D3',
-    fontSize: 16,
-  },
-  displayNameSaveBtn: {
-    backgroundColor: '#5B8A72',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#3D5E4A',
-  },
-  displayNameSaveBtnDisabled: {
-    opacity: 0.7,
-  },
-  displayNameSaveText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  displayNameError: {
-    color: '#EF4444',
-    fontSize: 12,
-    marginTop: -8,
-    marginBottom: 8,
-    marginHorizontal: 18,
   },
   settingLabelContainer: {
     alignItems: 'center',

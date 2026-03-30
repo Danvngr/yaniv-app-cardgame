@@ -436,11 +436,16 @@ class SocketService {
       this.onError?.('Not connected to server');
       return;
     }
+    const normalizedCode = String(code ?? '').trim().replace(/\s/g, '').toUpperCase();
+    if (normalizedCode.length !== 6) {
+      this.onError?.('Room not found');
+      return;
+    }
     // Store player info for potential reconnection
-    this.lastRoomCode = code;
+    this.lastRoomCode = normalizedCode;
     this.lastPlayerName = playerName;
     this.lastPlayerAvatar = playerAvatar;
-    this.socket.emit('joinRoom', { code, player: { name: playerName, avatar: playerAvatar } });
+    this.socket.emit('joinRoom', { code: normalizedCode, player: { name: playerName, avatar: playerAvatar } });
   }
 
   leaveRoom(): void {

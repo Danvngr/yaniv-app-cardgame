@@ -63,6 +63,12 @@ Then deploy:
 fly deploy
 ```
 
+**Important:** So that all players see the same rooms (in-memory), run exactly one machine:
+
+```bash
+fly scale count 1
+```
+
 ### 4. Update Client
 
 After deployment, update `lib/socketService.ts` with your server URL:

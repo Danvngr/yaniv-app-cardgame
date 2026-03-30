@@ -22,7 +22,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
   const bgMusicRef = useRef<Audio.Sound | null>(null);
   const isMusicLoadedRef = useRef(false);
 
-  // טעינת העדפות מ-AsyncStorage
+  // Load preferences from AsyncStorage
   useEffect(() => {
     (async () => {
       try {
@@ -37,7 +37,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  // טעינת מוזיקת הרקע פעם אחת (בלי להתחיל לנגן - ההגדרה נטענת אחר כך)
+  // Load background music once (do not play until settings + sound are ready)
   useEffect(() => {
     let isMounted = true;
     const loadBackgroundMusic = async () => {
@@ -67,7 +67,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ניגון/עצירת מוזיקת רקע לפי ההגדרה (רק אחרי שטענו הגדרות + סאונד)
+  // Play/stop background music per setting (only after prefs and sound are loaded)
   useEffect(() => {
     if (!loaded || !soundReady) return;
     const sound = bgMusicRef.current;
@@ -80,7 +80,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     }
   }, [musicOn, loaded, soundReady]);
 
-  // ניקוי בעת unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (bgMusicRef.current) {

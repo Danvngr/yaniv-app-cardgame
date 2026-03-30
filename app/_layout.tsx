@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, BackHandler, StyleSheet, Text, View } from 'react-native';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { LanguageProvider } from '../context/LanguageContext';
 import { SoundProvider } from '../context/SoundContext';
 import GameInvitePopup from './GameInvitePopup';
 import { preloadAssets } from '../lib/assetPreloader';
@@ -250,9 +251,11 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <SoundProvider>
-        <RootLayoutNav />
-      </SoundProvider>
+      <LanguageProvider>
+        <SoundProvider>
+          <RootLayoutNav />
+        </SoundProvider>
+      </LanguageProvider>
     </AuthProvider>
   );
 }

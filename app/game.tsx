@@ -3,6 +3,7 @@ import { Check, Copy, Crown, Plus, RefreshCw, Share2, Trophy, Users, X, Zap } fr
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Clipboard, Dimensions, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { ClientRoom, socketService } from '../lib/socketService';
 import { getFriends, sendGameInvite, setUserInRoom, subscribeToFriends, type Friend } from '../lib/userService';
 
@@ -12,7 +13,7 @@ export default function GameScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, profile } = useAuth();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [invitedAiCount, setInvitedAiCount] = useState(0);
@@ -28,9 +29,6 @@ export default function GameScreen() {
   const [room, setRoom] = useState<ClientRoom | null>(null);
   const [isConnected, setIsConnected] = useState(socketService.isConnected());
   const [missingRoomWarning, setMissingRoomWarning] = useState(false);
-
-  useEffect(() => {
-  }, []);
 
   const isRTL = language === 'he';
   const maxPlayers = 4;
@@ -73,7 +71,7 @@ export default function GameScreen() {
       sendToFriends: 'Send to friends to join',
       waiting: 'Waiting...',
       settings: 'Settings',
-      upTo: 'Up to',
+      upTo: 'Score',
       stickingAllowed: 'Sticking ON',
       stickingNotAllowed: 'Sticking OFF',
       startGame: 'Start Game 🚀',
@@ -84,10 +82,8 @@ export default function GameScreen() {
       invite: 'Invite',
       noOnlineFriends: 'No friends online',
       inviteSent: 'Invite sent',
-      onlineFriendsTitle: 'Friends online',
       aiPlayersTitle: 'AI players',
-      aiHuman: 'AI (Human)',
-      aiHumanDesc: 'Balanced level like a real player',
+      aiHuman: 'AI',
       addAi: 'Add AI',
       hostOnly: 'Host only',
       loading: 'Loading...',
@@ -104,7 +100,7 @@ export default function GameScreen() {
       sendToFriends: 'שלח לחברים כדי שיצטרפו',
       waiting: 'ממתין...',
       settings: 'הגדרות',
-      upTo: 'עד',
+      upTo: 'ניקוד',
       stickingAllowed: 'הדבקות מופעלת',
       stickingNotAllowed: 'ללא הדבקות',
       startGame: 'התחל משחק 🚀',
@@ -113,12 +109,10 @@ export default function GameScreen() {
       addFriend: 'הזמן חבר',
       inviteFriends: 'הזמן חברים',
       invite: 'הזמן',
-      noOnlineFriends: 'אין חברים באונליין',
+      noOnlineFriends: 'אין חברים מחוברים',
       inviteSent: 'הזמנה נשלחה',
-      onlineFriendsTitle: 'חברים באונליין',
       aiPlayersTitle: 'שחקני AI',
-      aiHuman: 'AI בדרגת אדם',
-      aiHumanDesc: 'רמה מאוזנת כמו שחקן אמיתי',
+      aiHuman: 'AI',
       addAi: 'הוסף AI',
       hostOnly: 'רק מארח',
       loading: 'טוען...',
@@ -231,7 +225,7 @@ export default function GameScreen() {
     loadFriends();
   }, [user]);
 
-  // כשהמודל "הזמן חברים" פתוח – מנוי בזמן אמת לרשימת החברים (כולל inRoom)
+  // While "invite friends" modal is open, subscribe to friends list in real time (including inRoom)
   useEffect(() => {
     if (!showInviteModal || !user) return;
     setLoadingFriends(true);
@@ -507,7 +501,7 @@ export default function GameScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowInviteModal(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={styles.modalTitle}>{t.inviteFriends}</Text>
+              <View style={{ flex: 1 }} />
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
                 <Pressable
                   onPress={refreshFriendsList}
@@ -523,7 +517,6 @@ export default function GameScreen() {
               </View>
             </View>
             <ScrollView contentContainerStyle={styles.modalList} showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalSectionTitle}>{t.onlineFriendsTitle}</Text>
               {loadingFriends ? (
                 <View style={styles.modalLoading}>
                   <ActivityIndicator size="small" color="#F5E6D3" />
@@ -610,7 +603,6 @@ export default function GameScreen() {
                   <Text style={styles.modalAvatar}>🤖</Text>
                   <View>
                     <Text style={styles.modalName}>{t.aiHuman}</Text>
-                    <Text style={styles.modalSubText}>{t.aiHumanDesc}</Text>
                   </View>
                 </View>
                 <View style={[styles.aiAddButton, !isHost && styles.aiAddButtonDisabled]}>

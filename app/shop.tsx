@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ArrowRight, ShoppingBag, Check } from 'lucide-react-native';
+import { useLanguage } from '../context/LanguageContext';
 
 type ShopItem = {
   id: string;
@@ -17,7 +18,7 @@ type TabKey = 'avatars' | 'backs';
 
 export default function ShopScreen() {
   const router = useRouter();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabKey>('avatars');
   const [message, setMessage] = useState<string | null>(null);
   const [avatars, setAvatars] = useState<ShopItem[]>([

@@ -231,8 +231,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof data.avatar === 'string') {
         AsyncStorage.setItem(PROFILE_AVATAR_KEY, data.avatar).catch(() => {});
       }
-    } catch (error) {
-      console.error('[Auth] Failed to update profile:', error);
+    } catch (error: any) {
+      // "username-taken" is an expected validation outcome handled by UI.
+      if (error?.message !== 'username-taken') {
+        console.error('[Auth] Failed to update profile:', error);
+      }
       throw error; // Re-throw so caller can handle it
     }
   };

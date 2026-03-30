@@ -3,6 +3,7 @@ import { ArrowRight, Check, Crown, Trophy, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { auth } from '../lib/firebase';
 import { setUserInRoom } from '../lib/userService';
 import { socketService } from '../lib/socketService';
@@ -11,7 +12,7 @@ export default function CreateRoomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, profile } = useAuth();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [scoreLimit, setScoreLimit] = useState(200);
   const [allowSticking, setAllowSticking] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -32,7 +33,7 @@ export default function CreateRoomScreen() {
     },
     he: {
       title: 'הגדרות משחק',
-      scoreLimit: 'תקרת ניקוד',
+      scoreLimit: 'ניקוד',
       sticking: 'הדבקות?',
       yes: 'כן',
       no: 'לא',

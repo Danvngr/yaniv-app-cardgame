@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Crown, Home, Medal, RotateCcw, Trophy } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { saveGameResult, setUserInRoom } from '../lib/userService';
 import { socketService } from '../lib/socketService';
 
@@ -17,7 +18,7 @@ type PlayerResult = {
   isMe: boolean;
 };
 
-// --- קונפטי ---
+// --- Confetti ---
 const ConfettiPiece = ({ delay, startX }: { delay: number; startX: number }) => {
   const fallAnim = useRef(new Animated.Value(-50)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -88,7 +89,7 @@ const Confetti = () => {
   );
 };
 
-// --- גביע מונפש ---
+// --- Animated trophy ---
 const AnimatedTrophy = () => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0.5)).current;
@@ -123,14 +124,14 @@ export default function GameOverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, profile } = useAuth();
-  const [language] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const roomName = params.roomName as string | undefined;
   const roomCode = params.roomCode as string | undefined;
   const scoreLimit = params.scoreLimit as string | undefined;
   const allowSticking = params.allowSticking as string | undefined;
   const hasSavedRef = useRef(false);
 
-  // פרסור נתונים מהפרמטרים
+  // Parse data from route params
   const players: PlayerResult[] = params.players
     ? JSON.parse(params.players as string)
     : [
@@ -140,7 +141,7 @@ export default function GameOverScreen() {
         { id: '4', name: 'אלי', avatar: '👑', score: 67, isMe: false },
       ];
 
-  // מיון לפי ניקוד (הנמוך ביותר מנצח)
+  // Sort by score (lowest wins)
   const sortedPlayers = [...players].sort((a, b) => a.score - b.score);
   const winner = sortedPlayers[0];
   const isViewerWinner = winner.isMe;
@@ -236,13 +237,13 @@ export default function GameOverScreen() {
       <Confetti />
 
       <View style={styles.content}>
-        {/* כותרת */}
+        {/* Title */}
         <Text style={styles.gameOverText}>{t.gameOver}</Text>
 
-        {/* גביע */}
+        {/* Trophy */}
         <AnimatedTrophy />
 
-        {/* המנצח */}
+        {/* Winner */}
         <View style={styles.winnerSection}>
           <Text style={styles.winnerLabel}>{isViewerWinner ? t.youWon : t.winner}</Text>
           <View style={styles.winnerCard}>
@@ -254,7 +255,7 @@ export default function GameOverScreen() {
           </View>
         </View>
 
-        {/* טבלת ניקוד */}
+        {/* Score table */}
         <View style={styles.scoresSection}>
           <Text style={styles.scoresTitle}>{t.finalScores}</Text>
           {sortedPlayers.map((player, index) => (
@@ -282,7 +283,7 @@ export default function GameOverScreen() {
           ))}
         </View>
 
-        {/* כפתורים */}
+        {/* Buttons */}
         <View style={styles.buttons}>
           <Pressable
             onPress={() => {

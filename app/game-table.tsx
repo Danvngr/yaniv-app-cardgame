@@ -8,34 +8,36 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
 import { useSound } from '../context/SoundContext';
+import { BACKGROUND_IMAGES, CARD_IMAGES } from '../lib/assetPreloader';
 import { playAssaf, playFlick, playPick, playStick, playYaniv } from '../lib/gameSounds';
 import { ClientGameState, RoundResult as ServerRoundResult, socketService } from '../lib/socketService';
 import { setUserInRoom } from '../lib/userService';
 
-// הפעלת LayoutAnimation לאנדרואיד
+// Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 const { width, height } = Dimensions.get('window');
 
-// --- גדלים (זום אין) ---
+// --- Sizes (zoomed in) ---
 const CARD_RATIO = 1.4;
 const AVATAR_SIZE = 48;
 const TURN_RING_SIZE = 60;
 const TURN_RING_STROKE = 3;
 const PROFILE_AVATAR_KEY = 'profile:avatar';
 const PROFILE_USERNAME_KEY = 'profile:username';
+const FALLBACK_AI_NAMES = ['Sage', 'Lyra', 'Finn', 'Juno', 'Atlas', 'Iris', 'Silas', 'Cora', 'Felix', 'Nova'];
 
-// קלפים שלי (למטה)
+// My hand cards (bottom)
 const MY_CARD_WIDTH = width * 0.18; 
 const MY_CARD_HEIGHT = MY_CARD_WIDTH * CARD_RATIO;
 
-// קלפי שולחן (ערימה באמצע) - גדולים
+// Table pile cards (center stacks) — larger
 const TABLE_CARD_WIDTH = width * 0.22;
 const TABLE_CARD_HEIGHT = TABLE_CARD_WIDTH * CARD_RATIO;
 
-// קלפי יריב - גדולים יותר לזום אין
+// Opponent cards — larger for zoomed-in layout
 const getMiniCardWidth = (playerCount: number) => {
     if (playerCount <= 2) return width * 0.17;
     if (playerCount === 3) return width * 0.15;
@@ -44,97 +46,31 @@ const getMiniCardWidth = (playerCount: number) => {
 const MINI_CARD_WIDTH = width * 0.17;
 const MINI_CARD_HEIGHT = MINI_CARD_WIDTH * CARD_RATIO;
 
-// --- מיקומים (מותאם לעיצוב טרופי) ---
-const TABLE_TOP_PCT = 0.56; // ערימה באמצע השולחן - יותר למטה
+// --- Positions (tropical layout) ---
+const TABLE_TOP_PCT = 0.56; // Piles slightly lower on table
 const TABLE_Y_POS = height * TABLE_TOP_PCT;
-const CENTER_OFFSET = 12 + (TABLE_CARD_WIDTH / 2); // מרווח בין הערימות
+const CENTER_OFFSET = 12 + (TABLE_CARD_WIDTH / 2); // Gap between deck and discard
 
 const PILE_POSITION = { x: width / 2 - CENTER_OFFSET, y: TABLE_Y_POS }; 
 const DECK_POSITION = { x: width / 2 + CENTER_OFFSET, y: TABLE_Y_POS }; 
 const HAND_POSITION = { x: width / 2, y: height - 80 }; 
 
-// מיקומי יריבים
+// Opponent positions
 const OPP_TOP_POSITION = { x: width / 2, y: 70 };
-const OPP_LEFT_POSITION = { x: 15, y: height * 0.21 }; // קרוב לקיר שמאל (מיקום מנפה מוגבה ב־30%)
-const OPP_RIGHT_POSITION = { x: width - 15, y: height * 0.21 }; // קרוב לקיר ימין
+const OPP_LEFT_POSITION = { x: 15, y: height * 0.21 }; // Near left wall; fan raised ~30%
+const OPP_RIGHT_POSITION = { x: width - 15, y: height * 0.21 }; // Near right wall
 
 type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades' | 'joker';
 type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'Joker';
 type Position = 'top' | 'left' | 'right';
 
-// === מיפוי תמונות קלפים ===
-const CARD_IMAGES: Record<string, any> = {
-    // Hearts
-    'hearts-A': require('../assets/images/cards/hearts/1-hearts.png'),
-    'hearts-2': require('../assets/images/cards/hearts/2-hearts.png'),
-    'hearts-3': require('../assets/images/cards/hearts/3-hearts.png'),
-    'hearts-4': require('../assets/images/cards/hearts/4-hearts.png'),
-    'hearts-5': require('../assets/images/cards/hearts/5-hearts.png'),
-    'hearts-6': require('../assets/images/cards/hearts/6-hearts.png'),
-    'hearts-7': require('../assets/images/cards/hearts/7-hearts.png'),
-    'hearts-8': require('../assets/images/cards/hearts/8-hearts.png'),
-    'hearts-9': require('../assets/images/cards/hearts/9-hearts.png'),
-    'hearts-10': require('../assets/images/cards/hearts/10-hearts.png'),
-    'hearts-J': require('../assets/images/cards/hearts/J-hearts.png'),
-    'hearts-Q': require('../assets/images/cards/hearts/Q-hearts.png'),
-    'hearts-K': require('../assets/images/cards/hearts/K-hearts.png'),
-    
-    // Diamonds
-    'diamonds-A': require('../assets/images/cards/diamonds/1-diamonds-Photoroom.png'),
-    'diamonds-2': require('../assets/images/cards/diamonds/2-diamonds-Photoroom.png'),
-    'diamonds-3': require('../assets/images/cards/diamonds/3-diamonds-Photoroom.png'),
-    'diamonds-4': require('../assets/images/cards/diamonds/4-diamonds-Photoroom.png'),
-    'diamonds-5': require('../assets/images/cards/diamonds/5-diamonds-Photoroom.png'),
-    'diamonds-6': require('../assets/images/cards/diamonds/6-diamonds-Photoroom.png'),
-    'diamonds-7': require('../assets/images/cards/diamonds/7-diamonds-Photoroom.png'),
-    'diamonds-8': require('../assets/images/cards/diamonds/8-diamonds-Photoroom.png'),
-    'diamonds-9': require('../assets/images/cards/diamonds/9-diamonds-Photoroom.png'),
-    'diamonds-10': require('../assets/images/cards/diamonds/10-diamonds-Photoroom.png'),
-    'diamonds-J': require('../assets/images/cards/diamonds/J-diamonds-Photoroom.png'),
-    'diamonds-Q': require('../assets/images/cards/diamonds/Q-diamonds-Photoroom.png'),
-    'diamonds-K': require('../assets/images/cards/diamonds/K-diamonds-Photoroom.png'),
-    
-    // Clubs
-    'clubs-A': require('../assets/images/cards/clubs/1 -clubs.png'),
-    'clubs-2': require('../assets/images/cards/clubs/2 -clubs.png'),
-    'clubs-3': require('../assets/images/cards/clubs/3 -clubs.png'),
-    'clubs-4': require('../assets/images/cards/clubs/4 -clubs.png'),
-    'clubs-5': require('../assets/images/cards/clubs/5 -clubs.png'),
-    'clubs-6': require('../assets/images/cards/clubs/6 -clubs.png'),
-    'clubs-7': require('../assets/images/cards/clubs/7-clubs.png'),
-    'clubs-8': require('../assets/images/cards/clubs/8 -clubs.png'),
-    'clubs-9': require('../assets/images/cards/clubs/9 -clubs.png'),
-    'clubs-10': require('../assets/images/cards/clubs/10 -clubs.png'),
-    'clubs-J': require('../assets/images/cards/clubs/j -clubs.png'),
-    'clubs-Q': require('../assets/images/cards/clubs/q -clubs.png'),
-    'clubs-K': require('../assets/images/cards/clubs/k -clubs.png'),
-    
-    // Spades
-    'spades-A': require('../assets/images/cards/spades/1-spades-Photoroom.png'),
-    'spades-2': require('../assets/images/cards/spades/2-spades-Photoroom.png'),
-    'spades-3': require('../assets/images/cards/spades/3-spades-Photoroom.png'),
-    'spades-4': require('../assets/images/cards/spades/4-spades-Photoroom.png'),
-    'spades-5': require('../assets/images/cards/spades/5-spades-Photoroom.png'),
-    'spades-6': require('../assets/images/cards/spades/6-spades-Photoroom.png'),
-    'spades-7': require('../assets/images/cards/spades/7-spades-Photoroom.png'),
-    'spades-8': require('../assets/images/cards/spades/8-spades-Photoroom.png'),
-    'spades-9': require('../assets/images/cards/spades/9-spades-Photoroom.png'),
-    'spades-10': require('../assets/images/cards/spades/10-spades-Photoroom.png'),
-    'spades-J': require('../assets/images/cards/spades/J-spades-Photoroom.png'),
-    'spades-Q': require('../assets/images/cards/spades/Q-spades-Photoroom.png'),
-    'spades-K': require('../assets/images/cards/spades/K-spades-Photoroom.png'),
-    
-    // Joker
-    'joker': require('../assets/images/cards/joker.png'),
-};
-
-// פונקציה לקבלת תמונת קלף
+// Resolve card face image (CARD_IMAGES from assetPreloader)
 const getCardImage = (suit: Suit, rank: Rank): any => {
     if (rank === 'Joker' || suit === 'joker') {
         return CARD_IMAGES['joker'];
     }
     const key = `${suit}-${rank}`;
-    return CARD_IMAGES[key] || null;
+    return (CARD_IMAGES as Record<string, any>)[key] || null;
 };
 
 interface Card {
@@ -182,7 +118,7 @@ interface RoundResult {
   scoreLimit: number;
 }
 
-// --- לוגיקה ---
+// --- Game logic helpers ---
 const getRankValue = (rank: Rank): number => {
     const map: Record<string, number> = {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, 
@@ -203,7 +139,7 @@ const sortHand = (cards: Card[]): Card[] => {
     });
 };
 
-// מערבוב מערך (Fisher-Yates shuffle)
+// Fisher-Yates shuffle
 const shuffleArray = <T,>(array: T[]): T[] => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -213,14 +149,14 @@ const shuffleArray = <T,>(array: T[]): T[] => {
     return shuffled;
 };
 
-// יצירת 4 חפיסות מלאות (כולל ג'וקרים) ומערבוב
+// Build N full decks (with jokers) and shuffle
 const generateFullDeck = (numDecks: number = 4): Card[] => {
     const suits: Suit[] = ['spades', 'clubs', 'hearts', 'diamonds'];
     const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const deck: Card[] = [];
     
     for (let d = 0; d < numDecks; d++) {
-        // 52 קלפים רגילים
+        // 52 standard cards per deck
         for (const suit of suits) {
             for (const rank of ranks) {
                 let value = parseInt(rank);
@@ -228,7 +164,7 @@ const generateFullDeck = (numDecks: number = 4): Card[] => {
                 deck.push({ id: `${d}-${suit}-${rank}`, suit, rank, value });
             }
         }
-        // 2 ג'וקרים לכל חפיסה
+        // 2 jokers per deck
         deck.push({ id: `${d}-joker-1`, suit: 'joker', rank: 'Joker', value: 0 });
         deck.push({ id: `${d}-joker-2`, suit: 'joker', rank: 'Joker', value: 0 });
     }
@@ -236,16 +172,16 @@ const generateFullDeck = (numDecks: number = 4): Card[] => {
     return shuffleArray(deck);
 };
 
-// חלוקת קלפים מהחפיסה
+// Deal cards from deck top
 const dealFromDeck = (deck: Card[], count: number): { dealt: Card[], remaining: Card[] } => {
     const dealt = sortHand(deck.slice(0, count));
     const remaining = deck.slice(count);
     return { dealt, remaining };
 };
 
-// פונקציה לאתחול המשחק (חלוקה לכל השחקנים)
+// Initialize offline deal (hands for all players)
 const initializeGame = (playerCount: number = 4, cardsPerPlayer: number = 5) => {
-    let deck = generateFullDeck(4); // 4 חפיסות = 216 קלפים
+    let deck = generateFullDeck(4); // 4 decks = 216 cards
     
     const hands: Card[][] = [];
     for (let i = 0; i < playerCount; i++) {
@@ -254,14 +190,14 @@ const initializeGame = (playerCount: number = 4, cardsPerPlayer: number = 5) => 
         deck = remaining;
     }
     
-    // קלף ראשון לערימה הפתוחה
+    // First card starts discard pile
     const firstDiscard = deck[0];
     deck = deck.slice(1);
     
     return { hands, initialDiscard: firstDiscard, remainingDeck: deck };
 };
 
-// יצירת קלף אקראי (לשימוש זמני / fallback)
+// Random card for temp use / fallback
 const generateRandomCard = (): Card => {
     const suits: Suit[] = ['spades', 'clubs', 'hearts', 'diamonds'];
     const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -371,21 +307,21 @@ const getOpponentHandPosition = (position: Position) => {
     return OPP_TOP_POSITION;
 };
 
-// --- רכיבים ויזואליים ---
+// --- Visual components ---
 
-const TropicalBackground = () => {
+const TropicalBackground = React.memo(() => {
     return (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
             <Image 
-                source={require('../assets/images/tropical-background.jpg')} 
+                source={BACKGROUND_IMAGES['tropical-background']} 
                 style={styles.tropicalBackgroundImage}
                 resizeMode="cover"
             />
         </View>
     );
-};
+});
 
-const CardBack = ({ size = 'regular' }: { size?: 'mini' | 'regular' | 'large' }) => {
+const CardBack = React.memo(({ size = 'regular' }: { size?: 'mini' | 'regular' | 'large' }) => {
     let widthStyle;
     if (size === 'mini') { widthStyle = styles.miniCardSize; }
     else if (size === 'large') { widthStyle = styles.myCardSize; }
@@ -394,13 +330,13 @@ const CardBack = ({ size = 'regular' }: { size?: 'mini' | 'regular' | 'large' })
     return (
         <View style={[styles.tropicalCardBack, widthStyle]}>
             <Image 
-                source={require('../assets/images/card-back.jpg')} 
+                source={BACKGROUND_IMAGES['card-back']} 
                 style={styles.cardBackImage}
                 resizeMode="cover"
             />
         </View>
     );
-};
+});
 
 type CardSize = 'mini' | 'regular' | 'large';
 
@@ -415,7 +351,7 @@ type PlayingCardProps = {
     style?: any;
 };
 
-const PlayingCard = ({ card, isFaceDown = false, isSelected = false, onPress, rotate = '0deg', translateY = 0, size = 'regular', style }: PlayingCardProps) => {
+const PlayingCard = React.memo(({ card, isFaceDown = false, isSelected = false, onPress, rotate = '0deg', translateY = 0, size = 'regular', style }: PlayingCardProps) => {
     if (isFaceDown) return <CardBack size={size} />;
     if (!card) return null;
 
@@ -427,7 +363,7 @@ const PlayingCard = ({ card, isFaceDown = false, isSelected = false, onPress, ro
         dimensionsStyle = styles.miniCardSize;
     }
     
-    // קבלת תמונת הקלף
+    // Card face asset
     const cardImage = getCardImage(card.suit, card.rank);
 
     return (
@@ -439,13 +375,24 @@ const PlayingCard = ({ card, isFaceDown = false, isSelected = false, onPress, ro
             />
         </Pressable>
     );
-};
+});
 
 const PlayerCardView = ({ card, index, total, isSelected, selectionIsValid, onPress, throwAnimValue, isStickCard }: any) => {
     const rotateDeg = (index - (total - 1) / 2) * 4;
     const cardOverlap = -MY_CARD_WIDTH * 0.45;
+
+    // Stable animated values – never switch between Animated.Value and plain number
+    const raiseAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(raiseAnim, {
+            toValue: isSelected ? -25 : 0,
+            duration: 120,
+            useNativeDriver: true,
+        }).start();
+    }, [isSelected]);
     
-    // קלף הדבקה - משתמשים ב-View רגיל, לא Animated
+    // Stick card: plain View, not Animated
     if (isStickCard) {
         return (
             <View style={{ 
@@ -457,32 +404,33 @@ const PlayerCardView = ({ card, index, total, isSelected, selectionIsValid, onPr
             </View>
         );
     }
-    
-    // קלף רגיל - נבחר או לא
-    const shouldBeRaised = isSelected;
-    
-    const animatedStyle = isSelected && throwAnimValue ? {
-        opacity: throwAnimValue.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 1, 0] }),
-        transform: [
-            { rotate: `${rotateDeg}deg` }, 
-            { translateY: throwAnimValue.interpolate({ inputRange: [0, 1], outputRange: [-20, -300] })},
-            { scale: throwAnimValue.interpolate({ inputRange: [0, 1], outputRange: [1.1, 0.5] })}
-        ]
-    } : { 
-        opacity: 1, 
-        transform: [
-            { rotate: `${rotateDeg}deg` },
-            { translateY: shouldBeRaised ? -25 : 0 }
-        ] 
-    };
+
+    const isThrowAnimating = isSelected && throwAnimValue;
+
+    const animOpacity = isThrowAnimating
+        ? throwAnimValue.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 1, 0] })
+        : 1;
+
+    const animTranslateY = isThrowAnimating
+        ? throwAnimValue.interpolate({ inputRange: [0, 1], outputRange: [-20, -300] })
+        : raiseAnim;
+
+    const animScale = isThrowAnimating
+        ? throwAnimValue.interpolate({ inputRange: [0, 1], outputRange: [1.1, 0.5] })
+        : 1;
 
     const cardStyle = isSelected ? (selectionIsValid ? styles.validSelectedCard : styles.selectedCard) : undefined;
 
     return (
-        <Animated.View style={{ 
-            marginLeft: index === 0 ? 0 : cardOverlap, 
-            zIndex: shouldBeRaised ? 100 : index, 
-            ...animatedStyle 
+        <Animated.View style={{
+            marginLeft: index === 0 ? 0 : cardOverlap,
+            zIndex: isSelected ? 100 : index,
+            opacity: animOpacity,
+            transform: [
+                { rotate: `${rotateDeg}deg` },
+                { translateY: animTranslateY },
+                { scale: animScale },
+            ],
         }}>
             <PlayingCard card={card} size="large" isSelected={false} onPress={onPress} style={cardStyle} />
         </Animated.View>
@@ -491,7 +439,7 @@ const PlayerCardView = ({ card, index, total, isSelected, selectionIsValid, onPr
 
 
 const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSecondsLeft, turnDurationSeconds = 60, lastMessage, revealedCards, playerCount = 2, position = 'top' }: { player: Player | PlayerWithCards, isMe?: boolean, isLeader?: boolean, handValue?: number, turnSecondsLeft?: number, turnDurationSeconds?: number, lastMessage?: string, revealedCards?: Card[], playerCount?: number, position?: 'top' | 'left' | 'right' }) => {
-    // בדיקה שהשחקן קיים
+    // Guard: player must exist
     if (!player || !player.id) {
         return null;
     }
@@ -512,13 +460,13 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const isLowTime = showTurnTimer && (turnSecondsLeft ?? 0) <= 10;
     
-    // גודל קלפים
+    // Mini card size
     const dynamicMiniCardWidth = getMiniCardWidth(playerCount);
     const miniScale = Math.max(1.0, Math.min(1.3, dynamicMiniCardWidth / MINI_CARD_WIDTH));
     
-    // האם המניפה אנכית (לצדדים) או אופקית (למעלה)
+    // Vertical fan (sides) vs horizontal fan (top)
     const isVerticalFan = position === 'left' || position === 'right';
-    const cardSpacing = isVerticalFan ? 28 : 35; // מרווח בין קלפים - גדול יותר
+    const cardSpacing = isVerticalFan ? 28 : 35; // Wider spacing between cards
 
     useEffect(() => {
         if (!isLowTime) {
@@ -535,7 +483,7 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
         return () => loop.stop();
     }, [isLowTime, pulseAnim]);
 
-    // רינדור הקלפים - אנכי או אופקי
+    // Render fan: vertical or horizontal
     const renderCardFan = () => {
         const cards = revealedCards && Array.isArray(revealedCards) && revealedCards.length > 0 
             ? revealedCards 
@@ -550,8 +498,8 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
             const middle = total > 0 ? (total - 1) / 2 : 0;
                         const diff = i - middle;
             
-            // עבור מניפה אנכית (שמאל/ימין) - קלפים מלמעלה למטה
-            // עבור מניפה אופקית (למעלה) - קלפים בקשת הפוכה (לכיוון התקרה)
+            // Side fans: top-to-bottom stack
+            // Top fan: inverted arc toward ceiling
             const transform = isVerticalFan 
                 ? [
                     { translateY: diff * cardSpacing },
@@ -561,8 +509,8 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
                 ]
                 : [
                     { translateX: diff * cardSpacing },
-                    { rotate: `${-diff * 12}deg` },  // הפוך את כיוון הסיבוב
-                    { translateY: -Math.abs(diff) * 8 },  // קשת לכיוון התקרה (מינוס = למעלה)
+                    { rotate: `${-diff * 12}deg` },  // Reverse rotation direction
+                    { translateY: -Math.abs(diff) * 8 },  // Arc upward (negative Y)
                     { scale: miniScale }
                 ];
             
@@ -577,12 +525,12 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
         });
     };
 
-    // עבור יריבים בצדדים - קלפים באמצע, לוגו+שם בצד הנגדי
+    // Side opponents: fan center, avatar+name on outer side
     if (!isMe && isVerticalFan) {
         const isLeftSide = position === 'left';
         return (
             <View style={[styles.sidePlayerWrapper, isLeftSide ? styles.sidePlayerLeft : styles.sidePlayerRight]}>
-                {/* הודעת צ'אט */}
+                {/* Chat bubble */}
                 {lastMessage ? (
                     <View style={[
                         styles.sidePlayerMessageBubble, 
@@ -592,14 +540,14 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
                     </View>
                 ) : null}
                 
-                {/* מיכל אופקי: קלפים + (לוגו+שם) */}
+                {/* Row: cards + (avatar+name) */}
                 <View style={[styles.sidePlayerContent, { flexDirection: isLeftSide ? 'row' : 'row-reverse' }]}>
-                    {/* קלפים */}
+                    {/* Cards */}
                     <View style={styles.verticalFanContainerSide}>
                         {renderCardFan()}
                     </View>
                     
-                    {/* לוגו ושם - בצד הנגדי של הקלפים */}
+                    {/* Avatar and name on opposite side from fan */}
                     <View style={[styles.sidePlayerInfo, { marginLeft: isLeftSide ? 8 : 0, marginRight: isLeftSide ? 0 : 8 }]}>
                         <View style={styles.avatarContainerSmall}>
                             {showTurnTimer ? (
@@ -629,16 +577,16 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
         );
     }
 
-    // עבור יריב למעלה (לא בצדדים) - קלפים למעלה, לוגו+שם למטה
+    // Top opponent: cards above, avatar+name below
     if (!isMe && position === 'top') {
         return (
             <View style={styles.topOpponentWrapper}>
-                {/* קלפים למעלה */}
+                {/* Cards on top */}
                 <View style={styles.topOpponentFanContainer}>
                     {renderCardFan()}
                 </View>
                 
-                {/* לוגו ושם למטה */}
+                {/* Avatar and name below */}
                 <View style={styles.topOpponentInfoBelow}>
                     {lastMessage ? (
                         <View style={styles.playerMessageBubble} pointerEvents="none">
@@ -672,7 +620,7 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
         );
     }
 
-    // עבור השחקן שלי - תצוגה רגילה
+    // Local player: standard layout
     return (
         <View style={[styles.playerWrapper, playerCount >= 4 ? styles.playerWrapperCompact : undefined]}>
             {lastMessage ? (
@@ -713,14 +661,14 @@ const PlayerView = ({ player, isMe = false, isLeader = false, handValue, turnSec
     );
 };
 
-// --- קומפוננטת ערימת זריקה משודרגת (עם תמיכה ברצף ובהסתרה) ---
+// --- Discard pile (runs, spread groups, hidden top card) ---
 const CARD_SPREAD = 28;
-const SET_GROUP_SPREAD_PAIR = 72;   // זוג – קלפים נפרדים
-const SET_GROUP_SPREAD_34 = 48;     // שלישייה/רביעייה – צמצום פתיחה לטלפון
+const SET_GROUP_SPREAD_PAIR = 72;   // Pair: cards more separated
+const SET_GROUP_SPREAD_34 = 48;     // Trips/quads: tighter spread for phones
 // Fixed width for discard area so the deck never shifts; use ~1/3 of max spread so deck is a bit left
 const MAX_DISCARD_SPREAD = 3 * Math.max(SET_GROUP_SPREAD_PAIR, SET_GROUP_SPREAD_34);
 const MAX_DISCARD_CONTAINER_WIDTH = TABLE_CARD_WIDTH + Math.floor(MAX_DISCARD_SPREAD / 3);
-const DiscardPile = ({
+const DiscardPile = React.memo(({
     cards,
     onPress,
     onPickFromGroup,
@@ -731,7 +679,7 @@ const DiscardPile = ({
 }: {
     cards: Card[];
     onPress: () => void;
-    onPickFromGroup?: (pick: 'first' | 'last' | number | string) => void; // string = cardId (בחירת קלף ספציפי בקבוצה)
+    onPickFromGroup?: (pick: 'first' | 'last' | number | string) => void; // string = cardId for pick in spread group
     isSelected: boolean;
     hiddenCardId: string | null;
     lastGroupCards?: Card[];
@@ -740,25 +688,60 @@ const DiscardPile = ({
     const groupCards = lastGroupCards || [];
     const groupSize = groupCards.length;
     const isRun = groupSize >= 3 && isRunSet(groupCards, 3);
-    const isSetGroup = groupSize >= 2 && isSameRankSet(groupCards, 2); // זוג/שלישייה/רביעייה
+    const isSetGroup = groupSize >= 2 && isSameRankSet(groupCards, 2); // pair / trips / quads
     const showSpread = isRun || isSetGroup;
+    const [closingCards, setClosingCards] = useState<Card[] | null>(null);
+    const collapseAnim = useRef(new Animated.Value(1)).current;
+    const prevShowSpreadRef = useRef(showSpread);
+    const prevSpreadCardsRef = useRef<Card[]>(groupCards);
+
+    // Remember last spread group for smooth collapse next turn
+    useEffect(() => {
+        if (showSpread && groupCards.length >= 2) {
+            prevSpreadCardsRef.current = groupCards;
+        }
+    }, [showSpread, groupCards]);
+
+    // Animate from spread back to stacked pile
+    useEffect(() => {
+        const wasSpread = prevShowSpreadRef.current;
+        if (wasSpread && !showSpread) {
+            const cardsToClose = prevSpreadCardsRef.current;
+            if (cardsToClose.length >= 2) {
+                setClosingCards(cardsToClose);
+                collapseAnim.setValue(1);
+                Animated.timing(collapseAnim, {
+                    toValue: 0,
+                    duration: 220,
+                    useNativeDriver: true
+                }).start(() => {
+                    setClosingCards(null);
+                });
+            }
+        }
+        prevShowSpreadRef.current = showSpread;
+    }, [showSpread, collapseAnim]);
+
     const canPickFirstOrLast = isRun && allowGroupPick && onPickFromGroup;
-    const canPickAnyInGroup = isSetGroup && !isRun && allowGroupPick && onPickFromGroup; // בחירת כל קלף בקבוצה
-    const visibleCards = showSpread ? groupCards : cards.slice(-5);
-    const spread = showSpread && isSetGroup && !isRun
-        ? (groupSize >= 3 ? SET_GROUP_SPREAD_34 : SET_GROUP_SPREAD_PAIR)
+    const canPickAnyInGroup = isSetGroup && !isRun && allowGroupPick && onPickFromGroup; // Any card in group pickable
+    const displayCards = closingCards ?? (showSpread ? groupCards : cards.slice(-5));
+    const displayIsRun = displayCards.length >= 3 && isRunSet(displayCards, 3);
+    const displayIsSetGroup = displayCards.length >= 2 && isSameRankSet(displayCards, 2);
+    const showSpreadVisual = showSpread || (!!closingCards && (displayIsRun || displayIsSetGroup));
+    const spread = showSpreadVisual && displayIsSetGroup && !displayIsRun
+        ? (displayCards.length >= 3 ? SET_GROUP_SPREAD_34 : SET_GROUP_SPREAD_PAIR)
         : CARD_SPREAD;
-    const totalSpread = showSpread ? (visibleCards.length - 1) * spread : 0;
+    const totalSpread = showSpreadVisual ? (displayCards.length - 1) * spread : 0;
     const containerWidth = TABLE_CARD_WIDTH + totalSpread;
 
     const renderCard = (card: Card, index: number) => {
-        const isTop = index === visibleCards.length - 1;
+        const isTop = index === displayCards.length - 1;
         const seed = card.id.charCodeAt(0);
         let offsetX = 0, offsetY = 0, rotation = 0, opacity = 1;
-        if (showSpread) {
+        if (showSpreadVisual) {
             offsetX = index * spread;
             offsetY = (index % 2 === 0) ? -8 : 8;
-            rotation = (index - (visibleCards.length - 1) / 2) * 3;
+            rotation = (index - (displayCards.length - 1) / 2) * 3;
             opacity = card.id === hiddenCardId ? 0 : (index === 0 || isTop ? 1 : 0.85);
         } else {
             if (!isTop) {
@@ -766,24 +749,31 @@ const DiscardPile = ({
                 offsetY = ((seed * 2) % 20) - 10;
                 rotation = (seed % 30) - 15;
             }
-            opacity = card.id === hiddenCardId ? 0 : (isTop ? 1 : Math.max(0.7, 0.7 + (index / (visibleCards.length - 1)) * 0.3));
+            opacity = card.id === hiddenCardId ? 0 : (isTop ? 1 : Math.max(0.7, 0.7 + (index / (displayCards.length - 1)) * 0.3));
         }
+
+        const closingTranslateX = collapseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, offsetX] });
+        const closingTranslateY = collapseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, offsetY] });
+        const closingRotate = collapseAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${rotation}deg`] });
+
         return (
-            <View
+            <Animated.View
                 key={`${card.id}-${index}`}
                 style={{
                     position: 'absolute',
-                    left: showSpread ? offsetX : undefined,
+                    left: showSpreadVisual ? 0 : undefined,
                     zIndex: index,
-                    transform: showSpread
-                        ? [{ translateY: offsetY }, { rotate: `${rotation}deg` }]
+                    transform: showSpreadVisual
+                        ? closingCards
+                            ? [{ translateX: closingTranslateX }, { translateY: closingTranslateY }, { rotate: closingRotate }]
+                            : [{ translateX: offsetX }, { translateY: offsetY }, { rotate: `${rotation}deg` }]
                         : [{ translateX: offsetX }, { translateY: offsetY }, { rotate: `${rotation}deg` }],
                     opacity
                 }}
                 pointerEvents="none"
             >
                 <PlayingCard card={card} size="regular" />
-            </View>
+            </Animated.View>
         );
     };
 
@@ -791,7 +781,7 @@ const DiscardPile = ({
         return (
             <Pressable onPress={onPress} style={styles.pileContainer}>
                 <View style={styles.pilePlaceholder} pointerEvents="none" />
-                {visibleCards.map((card, index) => renderCard(card, index))}
+                {displayCards.map((card, index) => renderCard(card, index))}
             </Pressable>
         );
     }
@@ -802,8 +792,8 @@ const DiscardPile = ({
     if (canPickAnyInGroup) {
         return (
             <View style={[styles.pileContainer, { width: containerWidth, marginLeft: -extraWidth / 2 }]}>
-                {visibleCards.map((card, index) => renderCard(card, index))}
-                {visibleCards.map((card, index) => (
+                {displayCards.map((card, index) => renderCard(card, index))}
+                {displayCards.map((card, index) => (
                     <Pressable
                         key={card.id}
                         onPress={() => onPickFromGroup?.(card.id)}
@@ -823,14 +813,14 @@ const DiscardPile = ({
 
     return (
         <View style={[styles.pileContainer, { width: containerWidth, marginLeft: -extraWidth / 2 }]}>
-            {visibleCards.map((card, index) => renderCard(card, index))}
+            {displayCards.map((card, index) => renderCard(card, index))}
             <Pressable onPress={() => onPickFromGroup?.('first')} style={{ position: 'absolute', left: 0, top: 0, width: firstCardClickableWidth, height: TABLE_CARD_HEIGHT, zIndex: 50 }} />
             <Pressable onPress={() => onPickFromGroup?.('last')} style={{ position: 'absolute', left: firstCardClickableWidth, top: 0, width: containerWidth - firstCardClickableWidth, height: TABLE_CARD_HEIGHT, zIndex: 51 }} />
         </View>
     );
-};
+});
 
-const DeckPile = ({ onPress }: { onPress: () => void }) => (
+const DeckPile = React.memo(({ onPress }: { onPress: () => void }) => (
     <Pressable onPress={onPress} style={styles.deckContainer}>
         <View style={[styles.deckShadowCard, { top: -2, left: -1 }]}><CardBack size="regular" /></View>
         <View style={[styles.deckShadowCard, { top: -4, left: -2 }]}><CardBack size="regular" /></View>
@@ -838,30 +828,30 @@ const DeckPile = ({ onPress }: { onPress: () => void }) => (
             <CardBack size="regular" />
         </View>
     </Pressable>
-);
+));
 
-// --- קלף מעופף ---
-const FlyingCard = ({ startPos, endPos, card, onComplete, delay = 0, isFaceDown = false, isSlam = false, duration = 600, arcHeight: customArcHeight }: any) => {
+// --- Flying card overlay ---
+const FlyingCard = React.memo(({ startPos, endPos, card, onComplete, delay = 0, isFaceDown = false, isSlam = false, duration = 600, arcHeight: customArcHeight }: any) => {
     const anim = useRef(new Animated.Value(0)).current;
     
-    // יחס גדלים למניעת קפיצה (שולחן ליד)
+    // Scale ratio table card → hand card (avoids visual jump)
     const TABLE_TO_HAND_RATIO = TABLE_CARD_WIDTH / MY_CARD_WIDTH;
 
     useEffect(() => {
         if (isSlam) {
-            // אנימציית כאפה - נפילה מהירה ואגרסיבית מלמעלה
+            // Slam: fast aggressive drop from above
             Animated.sequence([
                 Animated.delay(delay),
                 Animated.timing(anim, { 
                     toValue: 1, 
                     duration: duration || 180, 
                     useNativeDriver: true, 
-                    // Easing אגרסיבי - מתחיל איטי ומאיץ לקראת הסוף (כמו נפילה חופשית)
+                    // Aggressive easing: slow start, accelerate (free-fall feel)
                     easing: Easing.bezier(0.25, 0.1, 0.25, 1)
                 })
             ]).start(({ finished }) => { if (finished && onComplete) onComplete(); });
         } else {
-            // זריקה רגילה: easing עדין בסוף כדי שהקלף יגיע ברציפות לראש הערימה בלי "עצירה" ואז נחיתה
+            // Normal throw: smooth end so card settles on pile top without a hard stop
             Animated.sequence([
                 Animated.delay(delay),
                 Animated.timing(anim, { 
@@ -877,26 +867,26 @@ const FlyingCard = ({ startPos, endPos, card, onComplete, delay = 0, isFaceDown 
     const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [startPos.x, endPos.x] });
     const baseTranslateY = anim.interpolate({ inputRange: [0, 1], outputRange: [startPos.y, endPos.y] });
     
-    // סיבוב - עבור כאפה, סיבוב דרמטי שמוסיף לאפקט הנחיתה
+    // Rotation: extra spin on slam for landing impact
     const rotate = isSlam 
         ? anim.interpolate({ inputRange: [0, 0.3, 0.7, 1], outputRange: ['-15deg', '-8deg', '12deg', '0deg'] })
         : anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
     const isThrowing = startPos.y > endPos.y;
-    const defaultArcHeight = isThrowing ? 0 : -40; // זריקה לערימה: בלי קשת – קו ישר עד ראש הערימה
+    const defaultArcHeight = isThrowing ? 0 : -40; // Throw to pile: straight path to top of stack
     const arcHeight = customArcHeight !== undefined ? customArcHeight : defaultArcHeight;
     
-    // עבור כאפה - bounce קטן וחד בסוף הנחיתה. זריקה רגילה - בלי קשת (arcHeight=0) כדי שהקלף יגיע ישר לראש הערימה
+    // Slam: short sharp bounce on land. Normal throw: arcHeight 0 = straight to pile top
     const arcTranslateY = isSlam
         ? anim.interpolate({ 
             inputRange: [0, 0.85, 0.92, 1], 
-            outputRange: [0, 0, -12, 0]  // bounce קצר וחד
+            outputRange: [0, 0, -12, 0]  // Short sharp bounce
         })
         : anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, arcHeight, 0] });
     
     const translateY = Animated.add(baseTranslateY, arcTranslateY);
     
-    // סקייל - עבור כאפה, הקלף גדל תוך כדי נפילה ואז "מתפוצץ" בנחיתה
+    // Scale: slam grows through fall then pops at impact
     const scale = isSlam 
         ? anim.interpolate({ 
             inputRange: [0, 0.5, 0.85, 0.92, 1], 
@@ -914,9 +904,9 @@ const FlyingCard = ({ startPos, endPos, card, onComplete, delay = 0, isFaceDown 
             <PlayingCard card={card} size="large" isFaceDown={isFaceDown} />
         </Animated.View>
     );
-};
+});
 
-// --- קונפטי ---
+// --- Confetti ---
 const CONFETTI_COLORS = ['#FBBF24', '#F59E0B', '#EF4444', '#22C55E', '#3B82F6', '#A855F7', '#EC4899'];
 const CONFETTI_COUNT = 30;
 
@@ -965,58 +955,207 @@ const Confetti = ({ active }: { active: boolean }) => {
     );
 };
 
-// --- אנימציית סיום סיבוב (יניב/אסף) ---
-const RoundEndOverlay = ({ type, winnerName, onComplete }: { type: RoundEndType; winnerName: string; onComplete: () => void }) => {
-    const scaleAnim = useRef(new Animated.Value(0)).current;
-    const opacityAnim = useRef(new Animated.Value(0)).current;
-    const [showConfetti, setShowConfetti] = useState(false);
+// --- Round-end effects (region confetti / giant hand on Assaf) ---
+const FLOWERS_PHASE_MS = 1000;
+const SLAP_PHASE_MS = 1500;
 
-    useEffect(() => {
-        if (!type) return;
-        
-        if (type === 'yaniv') {
-            setShowConfetti(true);
-        }
+function useConfettiParticles() {
+  return useMemo(() => {
+    const particles: { id: number; color: string; left: number; top: number; size: number; rotate: number; drift: number }[] = [];
+    for (let i = 0; i < CONFETTI_COUNT; i++) {
+      particles.push({
+        id: i,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        left: Math.random() * 100,
+        top: Math.random() * 100,
+        size: 6 + Math.random() * 8,
+        rotate: Math.random() * 360,
+        drift: (Math.random() - 0.5) * 40,
+      });
+    }
+    return particles;
+  }, []);
+}
 
-        Animated.parallel([
-            Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-            Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true })
-        ]).start();
+type Region = 'top' | 'left' | 'right' | 'bottom';
 
-        const timer = setTimeout(() => {
-            Animated.parallel([
-                Animated.timing(scaleAnim, { toValue: 0.8, duration: 300, useNativeDriver: true }),
-                Animated.timing(opacityAnim, { toValue: 0, duration: 300, useNativeDriver: true })
-            ]).start(() => {
-                setShowConfetti(false);
-                onComplete();
-            });
-        }, 2000);
-
-        return () => clearTimeout(timer);
-    }, [type]);
-
-    if (!type) return null;
-
-    const isYaniv = type === 'yaniv';
-    const title = isYaniv ? 'יניב!' : 'אסף!';
-    const emoji = isYaniv ? '🎉' : '💥';
-
-    return (
-        <Animated.View style={[styles.roundEndOverlay, { opacity: opacityAnim }]}>
-            <Confetti active={showConfetti} />
-            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <View style={styles.roundEndCard}>
-                    <Text style={styles.roundEndEmoji}>{emoji}</Text>
-                    <Text style={styles.roundEndTitle}>{title}</Text>
-                    <Text style={styles.roundEndWinner}>{winnerName}</Text>
-                </View>
-            </Animated.View>
-        </Animated.View>
-    );
+const REGION_STYLES: Record<Region, { position: 'absolute'; top?: number; left?: number; right?: number; bottom?: number; width?: number; height?: number }> = {
+  top:    { position: 'absolute', top: 0, left: 0, right: 0, height: height * 0.38 },
+  bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.38 },
+  left:   { position: 'absolute', top: height * 0.18, left: 0, width: width * 0.30, bottom: height * 0.32 },
+  right:  { position: 'absolute', top: height * 0.18, right: 0, width: width * 0.30, bottom: height * 0.32 },
 };
 
-// --- רכיב ראשי ---
+// Region centers (slap anim: origin → target)
+const REGION_CENTERS: Record<Region, { x: number; y: number }> = {
+  top:    { x: width / 2, y: (height * 0.38) / 2 },
+  bottom: { x: width / 2, y: height - (height * 0.38) / 2 },
+  left:   { x: (width * 0.30) / 2, y: height * 0.18 + (height * (1 - 0.18 - 0.32)) / 2 },
+  right:  { x: width - (width * 0.30) / 2, y: height * 0.18 + (height * (1 - 0.18 - 0.32)) / 2 },
+};
+
+const RegionConfettiOverlay = ({ region }: { region: Region }) => {
+  const progress = useRef(new Animated.Value(0)).current;
+  const particles = useConfettiParticles();
+  useEffect(() => {
+    progress.setValue(0);
+    Animated.timing(progress, { toValue: 1, duration: 1600, useNativeDriver: true }).start();
+    return () => progress.setValue(0);
+  }, [region]);
+
+  return (
+    <Animated.View pointerEvents="none" style={[REGION_STYLES[region], { overflow: 'hidden', zIndex: 50 }]}>
+      {particles.map((p) => {
+        const translateY = progress.interpolate({ inputRange: [0, 0.15, 1], outputRange: [-20, 0, 100] });
+        const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [0, p.drift] });
+        const particleOpacity = progress.interpolate({ inputRange: [0, 0.08, 0.75, 1], outputRange: [0, 1, 1, 0] });
+        const scale = progress.interpolate({ inputRange: [0, 0.1, 1], outputRange: [0.3, 1, 1] });
+        return (
+          <Animated.View
+            key={p.id}
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+              width: p.size,
+              height: p.size * 1.4,
+              backgroundColor: p.color,
+              borderRadius: 1,
+              transform: [{ translateY }, { translateX }, { rotate: `${p.rotate}deg` }, { scale }],
+              opacity: particleOpacity,
+            }}
+          />
+        );
+      })}
+    </Animated.View>
+  );
+};
+
+const SLAP_HAND_SIZE = Math.min(width, height) * 0.45;
+
+const SlapOverlay = ({ originRegion, targetRegion }: { originRegion: Region; targetRegion: Region }) => {
+  const origin = REGION_CENTERS[originRegion];
+  const target = REGION_CENTERS[targetRegion];
+
+  // Raise hand above origin
+  const raiseX = 0;
+  const raiseY = -60;
+  // Move to point above target (wind-up)
+  const aboveTargetX = target.x - origin.x;
+  const aboveTargetY = target.y - origin.y - 80;
+  // Land — slap on target
+  const slapX = target.x - origin.x;
+  const slapY = target.y - origin.y;
+  // Overshoot past target (recoil from impact)
+  const overshootX = slapX + (slapX - raiseX) * 0.06;
+  const overshootY = slapY + 18;
+
+  const moveX = useRef(new Animated.Value(0)).current;
+  const moveY = useRef(new Animated.Value(0)).current;
+  const handRotate = useRef(new Animated.Value(0)).current;
+  const handScale = useRef(new Animated.Value(0.5)).current;
+  const handOpacity = useRef(new Animated.Value(0)).current;
+  const shakeX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    moveX.setValue(0);
+    moveY.setValue(0);
+    handRotate.setValue(0);
+    handScale.setValue(0.5);
+    handOpacity.setValue(0);
+    shakeX.setValue(0);
+
+    Animated.sequence([
+      // Phase 1: appear + raise hand (200ms)
+      Animated.parallel([
+        Animated.timing(handOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(handScale, { toValue: 1.15, duration: 200, useNativeDriver: true }),
+        Animated.timing(moveX, { toValue: raiseX, duration: 200, useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: raiseY, duration: 200, useNativeDriver: true }),
+        Animated.timing(handRotate, { toValue: -15, duration: 200, useNativeDriver: true }),
+      ]),
+      // Phase 2: move in air to above target (300ms)
+      Animated.parallel([
+        Animated.timing(moveX, { toValue: aboveTargetX, duration: 300, useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: aboveTargetY, duration: 300, useNativeDriver: true }),
+        Animated.timing(handRotate, { toValue: 25, duration: 300, useNativeDriver: true }),
+        Animated.timing(handScale, { toValue: 1.3, duration: 300, useNativeDriver: true }),
+      ]),
+      // Phase 3: slam down — fast (100ms)
+      Animated.parallel([
+        Animated.timing(moveX, { toValue: slapX, duration: 100, useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: slapY, duration: 100, useNativeDriver: true }),
+        Animated.timing(handRotate, { toValue: -5, duration: 100, useNativeDriver: true }),
+        Animated.timing(handScale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
+      ]),
+      // Phase 4: overshoot + bounce
+      Animated.parallel([
+        Animated.timing(moveX, { toValue: overshootX, duration: 60, useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: overshootY, duration: 60, useNativeDriver: true }),
+      ]),
+      // Shake — face wobble from impact
+      Animated.sequence([
+        Animated.timing(shakeX, { toValue: 12, duration: 40, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -10, duration: 40, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 8, duration: 35, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -5, duration: 35, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 0, duration: 30, useNativeDriver: true }),
+      ]),
+      // Return to target
+      Animated.parallel([
+        Animated.timing(moveX, { toValue: slapX, duration: 80, useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: slapY, duration: 80, useNativeDriver: true }),
+      ]),
+      // Hold on target
+      Animated.delay(350),
+      // Fade out
+      Animated.timing(handOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start(() => {
+      // Device haptic
+      try { Vibration.vibrate(50); } catch (_) {}
+    });
+
+    // Haptic at impact (~600ms)
+    const vibrateTimer = setTimeout(() => {
+      try { Vibration.vibrate(50); } catch (_) {}
+    }, 600);
+
+    return () => {
+      clearTimeout(vibrateTimer);
+      moveX.setValue(0);
+      moveY.setValue(0);
+      handOpacity.setValue(0);
+    };
+  }, [originRegion, targetRegion]);
+
+  const rotateStr = handRotate.interpolate({ inputRange: [-180, 180], outputRange: ['-180deg', '180deg'] });
+
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 55 }]}>
+      <Animated.Text
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: origin.x - SLAP_HAND_SIZE / 2,
+          top: origin.y - SLAP_HAND_SIZE / 2,
+          fontSize: SLAP_HAND_SIZE,
+          opacity: handOpacity,
+          transform: [
+            { translateX: Animated.add(moveX, shakeX) },
+            { translateY: moveY },
+            { scale: handScale },
+            { rotate: rotateStr },
+          ],
+        }}
+      >
+        🖐️
+      </Animated.Text>
+    </View>
+  );
+};
+
+// --- Main screen ---
 export default function GameTableScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -1051,7 +1190,7 @@ export default function GameTableScreen() {
       // fallback: 1 human + 1 AI
       return [
           { name: 'אתה', avatar: '😎', isHost: true, isAi: false },
-          { name: 'AI 1', avatar: '🤖', isHost: false, isAi: true }
+          { name: FALLBACK_AI_NAMES[Math.floor(Math.random() * FALLBACK_AI_NAMES.length)], avatar: '🤖', isHost: false, isAi: true }
       ];
   };
   const roomPlayers = parseRoomPlayers();
@@ -1059,11 +1198,11 @@ export default function GameTableScreen() {
   const lastRoundIdRef = useRef(roundId);
   const roundEndHandledRef = useRef(false);
   
-  // מידע על מנצח הסיבוב הקודם (להחלטה מי מתחיל) - רלוונטי רק למצב אופליין
+  // Previous round winner (who starts) — offline only
   const prevWinnerId = params.prevWinnerId as string | undefined;
   const isFirstRound = !prevWinnerId;
 
-  // אתחול המשחק - 4 חפיסות מעורבבות, חלוקה לכל השחקנים
+  // Initial deal: 4 shuffled decks, hands for all players
   const [gameInit, setGameInit] = useState(() => initializeGame(roomPlayers.length, 5));
   const deckRef = useRef<Card[]>(gameInit.remainingDeck);
 
@@ -1084,24 +1223,24 @@ export default function GameTableScreen() {
     discardPileRef.current = discardPile;
   }, [discardPile]);
   
-  // State חדש לניהול הקלף ה"מוסתר" בזמן אנימציה
+  // Card hidden during throw/draw animation
   const [hiddenCardId, setHiddenCardId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   
-  // === הדבקה (Slap/Stick) ===
-  // stickCardId - ה-ID של הקלף שניתן להדביק (null אם אין הדבקה זמינה)
+  // === Sticking (slap) ===
+  // stickCardId — card that can be stuck (null if no stick window)
   const [stickCardId, setStickCardId] = useState<string | null>(null);
-  // רפרנס לסנכרון מיידי בתוך callbacks (ללא בעיות closure)
+  // Ref for immediate reads inside callbacks (avoids stale closure)
   const stickCardIdRef = useRef<string | null>(null);
   useEffect(() => {
       stickCardIdRef.current = stickCardId;
   }, [stickCardId]);
-  // lastDiscardedRank - הרנק של הקלף האחרון שנזרק (למוד אופליין)
+  // lastDiscardedRank — rank of last discard (offline stick logic)
   const [lastDiscardedRank, setLastDiscardedRank] = useState<Rank | null>(null);
-  // טיימר להדבקה
+  // Stick window timer
   const stickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // ניקוי טיימר הדבקה כשהקומפוננטה מתפרקת
+  // Clear stick timer on unmount
   useEffect(() => {
       return () => {
           if (stickTimerRef.current) {
@@ -1110,7 +1249,7 @@ export default function GameTableScreen() {
       };
   }, []);
   
-  // 4 חפיסות = 216 קלפים, מינוס 4 שחקנים * 5 קלפים = 20, מינוס 1 קלף פתוח = 195
+  // 4 decks = 216 cards − 4×5 dealt − 1 discard top = 195 in deck (example for 4 players)
   const [deckCount, setDeckCount] = useState(deckRef.current.length);
   const [animatingCards, setAnimatingCards] = useState<any[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
@@ -1164,7 +1303,7 @@ export default function GameTableScreen() {
   );
   const [myScore, setMyScore] = useState(initialScores.me);
   
-  // חישוב מי מתחיל את הסיבוב
+  // Who starts the round
   const getStartingTurnIndex = () => {
       if (isOnlineMode) {
 
@@ -1173,12 +1312,12 @@ export default function GameTableScreen() {
       const order = ['me', ...opponentIds.slice(0, roomPlayers.length - 1)];
 
       if (isFirstRound) {
-          // סיבוב ראשון - רנדומלי
+          // First round: random starter
           const randomIdx = Math.floor(Math.random() * order.length);
 
           return randomIdx;
       }
-      // סיבובים הבאים - המנצח מתחיל
+      // Later rounds: previous winner starts
       if (prevWinnerId === 'me') {
 
           return 0;
@@ -1214,7 +1353,7 @@ export default function GameTableScreen() {
       setStickCardId(null);
       setLastDiscardedRank(null);
       setDeckCount(nextInit.remainingDeck.length);
-      // התור הראשון - רנדומלי בסיבוב ראשון, אחרת המנצח מתחיל (אופליין בלבד)
+      // First turn: random on round 1, else winner leads (offline only)
       if (!isOnlineMode) {
           setCurrentTurnIndex(getStartingTurnIndex());
       }
@@ -1248,14 +1387,37 @@ export default function GameTableScreen() {
   const [roundEndWinner, setRoundEndWinner] = useState<string>('');
   const [roundEndWinnerId, setRoundEndWinnerId] = useState<string>('');
   const [roundEndCallerId, setRoundEndCallerId] = useState<string>('');
+  const [roundEndPhase, setRoundEndPhase] = useState<'flowers' | 'slap' | null>(null);
   const [cardsRevealed, setCardsRevealed] = useState(false);
-  const SCORE_LIMIT = gameScoreLimit; // מתוך הגדרות החדר
+  const SCORE_LIMIT = gameScoreLimit; // From room settings
 
-  // צלילי סיום סיבוב (יניב / אסף)
+  // Round-end overlay: confetti on caller, then (if Assaf) slap on winner
   useEffect(() => {
-    if (!roundEndType || !sfxOn) return;
-    if (roundEndType === 'yaniv') playYaniv(true);
-    if (roundEndType === 'assaf') playAssaf(true);
+    if (!roundEndType) {
+      setRoundEndPhase(null);
+      return;
+    }
+    setRoundEndPhase('flowers');
+    if (roundEndType === 'yaniv') {
+      const t = setTimeout(() => handleRoundEndOverlayComplete(), 2000);
+      return () => clearTimeout(t);
+    }
+    if (roundEndType === 'assaf') {
+      const t1 = setTimeout(() => {
+        setRoundEndPhase('slap');
+        if (sfxOn) playAssaf(true);
+      }, FLOWERS_PHASE_MS);
+      const t2 = setTimeout(() => handleRoundEndOverlayComplete(), FLOWERS_PHASE_MS + SLAP_PHASE_MS);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [roundEndType]);
+
+  // Yaniv SFX when round end starts
+  useEffect(() => {
+    if (roundEndType && sfxOn) playYaniv(true);
   }, [roundEndType, sfxOn]);
 
   // === Socket handlers for online mode ===
@@ -1268,9 +1430,9 @@ export default function GameTableScreen() {
   const previousHandRef = useRef<Card[]>([]);
   const lastDrawSourceRef = useRef<'deck' | 'pile' | null>(null);
   const isWaitingForNewCardRef = useRef<boolean>(false);
-  // עבור הדבקה באונליין: הרנק של הקלף האחרון שנזרק (כדי לדעת אם הקלף שנמשך מאפשר הדבקה)
+  // Online stick: rank of last discard (detect stick when drawing matching rank)
   const lastThrownRankForStickRef = useRef<Rank | null>(null);
-  const isShowingRoundSummaryRef = useRef<boolean>(false); // לדחות עדכונים בזמן מסך סיכום
+  const isShowingRoundSummaryRef = useRef<boolean>(false); // Defer state updates while summary is shown
   const isThrowingCardsRef = useRef<boolean>(false);
   const pendingDiscardPileRef = useRef<Card[] | null>(null);
   const pendingDiscardGroupRef = useRef<Card[] | null>(null);
@@ -1293,7 +1455,7 @@ export default function GameTableScreen() {
     // Setup socket callbacks
     socketService.onGameStateUpdated = (gameState: ClientGameState) => {
 
-      // אם מסך הסיכום מוצג, דחה את כל העדכונים - הקלפים יחולקו אחרי שהמסך נסגר
+      // While summary is visible, defer updates — deal resumes after dismiss
       if (isShowingRoundSummaryRef.current) {
 
         return;
@@ -1358,16 +1520,15 @@ export default function GameTableScreen() {
             
             if (newCard) {
 
-              // === חשוב: אם מדובר בהדבקה (נמשך מהקופה והמספר זהה למה שנזרק) ===
-              // אז *אסור* להסתיר את הקלף מהיד בשביל אנימציית משיכה,
-              // אחרת השחקן רואה "חסר קלף" בדיוק בחלון ההדבקה.
-              // === חשוב: אם השרת כבר אמר שיש הדבקה, אסור להסתיר את הקלף החדש מהיד ===
-              // אחרת נראה "חסר קלף" לאורך חלון ההדבקה.
+              // === Stick from deck (same rank as discard): do NOT hide card for draw anim ===
+              // or the hand looks short during the stick window.
+              // === If server already marked stick, never hide the new card from hand ===
+              // or missing-card flicker persists for the whole window.
               const stickIdFromServer = stickCardIdRef.current;
               const isStickCardFromServer =
                 !!stickIdFromServer && newCards.some(nc => nc.id === stickIdFromServer);
 
-              // גיבוי: אם האירוע מהשרת הגיע אחרי ה-gameStateUpdated (נדיר), נזהה לפי רנק
+              // Fallback: server event after gameStateUpdated — detect by rank
               const isPotentialStickByRank =
                 lastDrawSourceRef.current === 'deck' &&
                 lastThrownRankForStickRef.current !== null &&
@@ -1380,14 +1541,14 @@ export default function GameTableScreen() {
               console.log('isStickCardFromServer:', isStickCardFromServer);
               console.log('isPotentialStickByRank:', isPotentialStickByRank);
 
-              if (isStickCardFromServer || isPotentialStickByRank) {
+              if (isStickCardFromServer || (allowSticking && isPotentialStickByRank)) {
                 console.log('=== STICK DETECTED! ===');
-                // משאירים את הקלף ביד כדי שניתן יהיה לסמן אותו בכחול ולהרים אותו
+                // Keep card in hand for blue highlight / raised state
                 setMyHand(sortedCards);
                 previousHandRef.current = sortedCards;
 
-                // אם עדיין אין stickCardId מהשרת (מקרה גיבוי) נגדיר אותו כאן
-                if (!stickIdFromServer) {
+                // If server has not sent stickCardId yet, set from client fallback
+                if (!stickIdFromServer && allowSticking) {
                   stickCardIdRef.current = newCard.id;
                   setStickCardId(newCard.id);
                 }
@@ -1408,14 +1569,13 @@ export default function GameTableScreen() {
               // Animate the new card coming to hand
               setIsAnimating(true);
               
-              // הקלף שאני לוקח תמיד פתוח עבורי (כי אני השחקן שלקח אותו)
-              // אחרים רואים את זה דרך animateOpponentMove עם הלוגיקה שלהם
+              // Self always sees drawn card face-up; others use animateOpponentMove
               const drawAnim = {
                 id: `draw-new-${newCard.id}-${Date.now()}`,
                 startPos: lastDrawSourceRef.current === 'pile' ? PILE_POSITION : DECK_POSITION,
                 endPos: HAND_POSITION,
                 card: newCard,
-                isFaceDown: false, // אני תמיד רואה את הקלף שלי פתוח
+                isFaceDown: false, // Local player always sees own draw face-up
                 delay: 0
               };
               setAnimatingCards(prev => [...prev, drawAnim]);
@@ -1475,7 +1635,7 @@ export default function GameTableScreen() {
                                (currentTopCard === 'none' && newTopCard !== 'none') ||
                                (discardPile.length === 0 && pile.length > 0);
 
-        // רק אם יש אנימציה פעילה - דחה את העדכון
+        // Defer pile update while throw/AI animation runs
         const hasActiveAnimation = isThrowingCardsRef.current || isAiAnimatingRef.current;
         
         if (hasActiveAnimation) {
@@ -1483,7 +1643,7 @@ export default function GameTableScreen() {
           pendingDiscardPileRef.current = pile;
           pendingDiscardGroupRef.current = (gameState.lastDiscardGroup ?? []).map(c => ({ id: c.id, suit: c.suit, rank: c.rank, value: c.value })) as Card[];
         } else {
-          // אין אנימציה פעילה - עדכן מיד
+          // No active animation — apply immediately
 
           setDiscardPile(pile);
           setLastDiscardGroup((gameState.lastDiscardGroup ?? []).map(c => ({ id: c.id, suit: c.suit, rank: c.rank, value: c.value })) as Card[]);
@@ -1593,7 +1753,7 @@ export default function GameTableScreen() {
 
       // Store result for navigation
       serverRoundResultRef.current = result;
-      isShowingRoundSummaryRef.current = true; // דחה עדכונים עד שמסך הסיכום יסגר
+      isShowingRoundSummaryRef.current = true; // Defer updates until summary closes
       
       setRoundEndType(result.type);
       setRoundEndWinner(result.winnerName);
@@ -1644,7 +1804,7 @@ export default function GameTableScreen() {
         };
       });
       
-      // המתנה 4 שניות לפני מעבר למסך הסיכום
+      // Wait 4s before navigating to game-over
       setTimeout(() => {
         hasLeftGameRef.current = true;
         router.replace({
@@ -1660,24 +1820,25 @@ export default function GameTableScreen() {
       }, 4000);
     };
     
-    // === הדבקה זמינה - השרת מודיע שניתן להדביק ===
+    // === Sticking available (server) ===
     socketService.onStickingAvailable = (card, timeoutMs) => {
+      if (!allowSticking) return;
       stickCardIdRef.current = card.id;
       setStickCardId(card.id);
       
-      // הקלף הוסתר באנימציה - הוסף אותו ליד מיד
+      // Card was hidden for anim — merge into hand immediately
       setMyHand(prev => {
         const cardExists = prev.some(c => c.id === card.id);
         if (cardExists) return prev;
         return sortHand([...prev, card]);
       });
       
-      // עצור אנימציות רלוונטיות
+      // Stop overlapping fly animations
       setAnimatingCards(prev => prev.filter(a => !a.id.includes(card.id)));
       setIsAnimating(false);
     };
     
-    // === זמן ההדבקה נגמר ===
+    // === Stick window ended ===
     socketService.onStickingExpired = () => {
       console.log('=== CLIENT: stickingExpired received ===');
       stickCardIdRef.current = null;
@@ -1686,6 +1847,14 @@ export default function GameTableScreen() {
     
     socketService.onRoomClosed = (reason) => {
       setRoomClosedReason(reason);
+    };
+
+    socketService.onChatMessage = (odId, name, text) => {
+      const senderName = odId === myServerPlayerId.current ? 'אתה' : name;
+      const id = `m-${Date.now()}-${odId}`;
+      setChatMessages(prev => [...prev, { id, sender: senderName, text }]);
+      setLastMessageByPlayer(prev => ({ ...prev, [senderName]: text }));
+      scheduleMessageClear(senderName);
     };
     
     socketService.onPlayerKicked = (reason) => {
@@ -1765,7 +1934,7 @@ export default function GameTableScreen() {
         });
       });
       
-      // משיכה מהערימה: הקלף יוצא מהערימה ומוצג פתוח – משתמשים בראש הערימה (השרת לא שולח ב-aiMove)
+      // Pile draw: animate top of pile face-up (server omits drawn card in aiMove)
       const isAiPileDraw = drawFrom === 'pile';
       const aiTopOfPile = discardPileRef.current?.length ? discardPileRef.current[discardPileRef.current.length - 1] : null;
       const drawDelay = cardsThrown.length * 50 + 200;
@@ -1822,14 +1991,14 @@ export default function GameTableScreen() {
         });
       });
       const isPileDraw = drawFrom === 'pile' || drawFrom === 'pileFirst' || drawFrom === 'pileLast' || drawFrom === 'pileIndex' || drawFrom === 'pileCardId';
-      // הקלף שנמשך חייב להיות זה שהיה בראש הערימה (לפני הזריקה), לא אחד מהקלפים שנזרקו
+      // Drawn pile card must be pre-throw top, not one of the cards just thrown
       const thrownIds = new Set(cardsThrown.map(c => c.id));
       const drawnCardOk = drawnCard && !thrownIds.has(drawnCard.id);
       const topOfPile = discardPileRef.current?.length ? discardPileRef.current[discardPileRef.current.length - 1] : null;
       const drawCard = isPileDraw
         ? (drawnCardOk ? drawnCard : (topOfPile ?? generateRandomCard()))
         : generateRandomCard();
-      // משיכה מהערימה: הקלף יוצא מהערימה ומוצג פתוח עד ליד היריב
+      // Pile draw: card flies face-up from pile to opponent hand
       const showFaceDown = !isPileDraw;
       const drawDelay = cardsThrown.length * 50 + 200;
       anims.push({
@@ -1866,36 +2035,36 @@ export default function GameTableScreen() {
       animateOpponentMove(playerId, cardsThrown, drawFrom, drawnCard);
     };
 
-    // === אנימציית הדבקה (כאפה) - כל השחקנים רואים ===
+    // === Stick animation (slam) — all clients ===
     socketService.onStickPerformed = (playerId, card) => {
       const isMe = playerId === myServerPlayerId.current;
       
-      // מחשבים מאיפה הקלף מתחיל
+      // Animation start from correct hand
       let startPos: { x: number; y: number };
       if (isMe) {
-        // אני עשיתי הדבקה - מהיד שלי (קצת למעלה כי הקלף מורם)
+        // Local player stick: from hand (raised)
         startPos = { x: HAND_POSITION.x, y: HAND_POSITION.y - 25 };
-        // מסירים את הקלף מהיד
+        // Remove from hand
         setMyHand(prev => prev.filter(c => c.id !== card.id));
-        // מנקים את ה-state
+        // Clear stick state
         setStickCardId(null);
         if (stickTimerRef.current) {
           clearTimeout(stickTimerRef.current);
           stickTimerRef.current = null;
         }
       } else {
-        // יריב עשה הדבקה - מהיד שלו
+        // Opponent stick: from their seat
         const currentOpponents = opponentsRef.current;
         const opponent = currentOpponents.find(o => o.id === playerId);
         startPos = opponent ? getOpponentHandPosition(opponent.position) : PILE_POSITION;
       }
       
-      // === אנימציית כאפה ===
+      // === Slam sequence ===
       const ts = Date.now();
       const animUp = `slap-up-${ts}`;
       const animSlam = `slap-slam-${ts}`;
       
-      // נקודה גבוהה מעל הערימה
+      // High point above discard pile
       const highPoint = { 
         x: PILE_POSITION.x, 
         y: PILE_POSITION.y - (height * 0.3)
@@ -1904,7 +2073,7 @@ export default function GameTableScreen() {
       const UP_TIME = 350;
       const SLAM_TIME = 150;
       
-      // שלב 1: עלייה מהיד למעלה
+      // Phase 1: lift from hand
       setAnimatingCards(prev => [...prev, { 
         id: animUp, 
         startPos: startPos, 
@@ -1916,7 +2085,7 @@ export default function GameTableScreen() {
         isSlam: false 
       }]);
       
-      // שלב 2: נפילה חדה על הערימה
+      // Phase 2: slam onto pile
       setTimeout(() => {
         setAnimatingCards(prev => {
           const filtered = prev.filter(a => a.id !== animUp);
@@ -1933,12 +2102,12 @@ export default function GameTableScreen() {
         });
       }, UP_TIME);
       
-      // שלב 3: צליל בדיוק ברגע הפגיעה
+      // Phase 3: SFX on impact
       setTimeout(() => {
         if (sfxOn) playStick(true);
       }, UP_TIME + SLAM_TIME);
       
-      // שלב 4: ניקוי
+      // Phase 4: cleanup overlay
       setTimeout(() => {
         setAnimatingCards(prev => prev.filter(a => a.id !== animSlam));
       }, UP_TIME + SLAM_TIME + 150);
@@ -2113,7 +2282,7 @@ export default function GameTableScreen() {
       [showChat, chatMessages]
   );
 
-  const opponentMessage = (name: string) => (showChat ? lastMessageByPlayer[name] : undefined);
+  const opponentMessage = (name: string) => lastMessageByPlayer[name] || undefined;
 
   const scheduleMessageClear = (sender: string) => {
       if (messageTimersRef.current[sender]) {
@@ -2129,27 +2298,29 @@ export default function GameTableScreen() {
   };
 
   const sendQuickEmoji = (emoji: string) => {
-      const id = `m-${Date.now()}`;
-      setChatMessages(prev => [...prev, { id, sender: 'אתה', text: emoji }]);
-      setLastMessageByPlayer(prev => ({ ...prev, 'אתה': emoji }));
-      scheduleMessageClear('אתה');
       setChatOpen(false);
       if (isOnlineMode) {
           socketService.sendChatMessage(emoji);
+      } else {
+          const id = `m-${Date.now()}`;
+          setChatMessages(prev => [...prev, { id, sender: 'אתה', text: emoji }]);
+          setLastMessageByPlayer(prev => ({ ...prev, 'אתה': emoji }));
+          scheduleMessageClear('אתה');
       }
   };
 
   const sendChatMessage = () => {
       const trimmed = chatInput.trim();
       if (!trimmed) return;
-      const id = `m-${Date.now()}`;
-      setChatMessages(prev => [...prev, { id, sender: 'אתה', text: trimmed }]);
-      setLastMessageByPlayer(prev => ({ ...prev, 'אתה': trimmed }));
       setChatInput('');
-      scheduleMessageClear('אתה');
       setChatOpen(false);
       if (isOnlineMode) {
           socketService.sendChatMessage(trimmed);
+      } else {
+          const id = `m-${Date.now()}`;
+          setChatMessages(prev => [...prev, { id, sender: 'אתה', text: trimmed }]);
+          setLastMessageByPlayer(prev => ({ ...prev, 'אתה': trimmed }));
+          scheduleMessageClear('אתה');
       }
   };
 
@@ -2227,7 +2398,7 @@ export default function GameTableScreen() {
       const discardGroup = getBestDiscardGroup(aiPlayer.cards);
       const remainingHand = aiPlayer.cards.filter(c => !discardGroup.some(d => d.id === c.id));
 
-      // קודם בודקים את הקלף העליון בערימה הנוכחית (לפני שה-AI זורק)
+      // Snapshot discard top before AI throw
       const topDiscardBeforeThrow = discardPile[discardPile.length - 1];
       
       const wouldFormGroupWithTop = (hand: Card[], candidate: Card) => {
@@ -2241,16 +2412,16 @@ export default function GameTableScreen() {
               remainingHand.some(c => c.rank === topDiscardBeforeThrow.rank) ||
               wouldFormGroupWithTop(remainingHand, topDiscardBeforeThrow)
           );
-      // עכשיו יוצרים את הערימה החדשה אחרי זריקת ה-AI
+      // Build post-throw discard pile
       let nextDiscardPile = [...discardPile, ...discardGroup];
       
       let drawnCard: Card;
       let drawSource: 'pile' | 'deck' = 'deck';
 
       if (shouldTakeFromPile && discardPile.length > 0) {
-          // לוקחים את הקלף שהיה למעלה לפני שה-AI זרק
+          // Take card that was on top before AI discard
           drawnCard = topDiscardBeforeThrow;
-          // מסירים אותו מהערימה (הוא נמצא לפני הקלפים שה-AI זרק)
+          // Remove it from pile (it sits under the new discard group)
           nextDiscardPile = nextDiscardPile.filter(c => c.id !== topDiscardBeforeThrow.id);
           drawSource = 'pile';
       } else {
@@ -2286,7 +2457,7 @@ export default function GameTableScreen() {
           startPos: drawSource === 'pile' ? PILE_POSITION : DECK_POSITION,
           endPos: opponentPos,
           card: drawnCard,
-          isFaceDown: drawSource === 'deck', // מהערימה הפתוחה = פנים למעלה, מהחפיסה = הפוך
+          isFaceDown: drawSource === 'deck', // Pile = face up; deck = face down
           delay: 200
       });
       setAnimatingCards(prev => [...prev, ...aiAnims]);
@@ -2372,7 +2543,7 @@ export default function GameTableScreen() {
       }
   };
 
-  // פונקציית חיתוך ניקוד - אם מגיעים בדיוק ל-50/100/150/200 הניקוד נחתך בחצי
+  // Yaniv score cut: landing exactly on 50/100/150/200 halves the total
   const applyScoreCut = (score: number): number => {
       const cutPoints = [50, 100, 150, 200];
       if (cutPoints.includes(score)) {
@@ -2385,6 +2556,7 @@ export default function GameTableScreen() {
       // Prevent multiple calls
       if (roundEndHandledRef.current) return;
       roundEndHandledRef.current = true;
+      setRoundEndPhase(null);
       
       // Stop and reset turn timer at round end
       setTurnSecondsLeft(TURN_DURATION_SECONDS);
@@ -2515,7 +2687,7 @@ export default function GameTableScreen() {
   };
 
   const handleCardTap = (card: Card) => {
-    // במצב הדבקה - לחיצה על קלפים ביד לא עושה כלום (חייב ללחוץ על הערימה!)
+    // During stick window, hand taps ignored — must tap discard pile
     if (stickCardId) {
       return;
     }
@@ -2529,7 +2701,7 @@ export default function GameTableScreen() {
   };
 
   const executeMove = (source: 'deck' | 'pile' | 'pileFirst' | 'pileLast' | 'pileIndex' | 'pileCardId', pileIndex?: number, pileCardId?: string) => {
-      // 1. הגנות
+      // 1. Guards
       if (isAnimating) return;
       if (!isViewerCurrentTurn) {
           return;
@@ -2546,7 +2718,7 @@ export default function GameTableScreen() {
       setIsAnimating(true);
       const cardsToThrow = myHand.filter(c => selectedCardIds.includes(c.id));
           const cardIdsToSend = [...selectedCardIds]; // Save before clearing
-          // שומרים את הרנק האחרון שנזרק לצורך הדבקה (אם הקלף שיימשך מהקופה יהיה אותו רנק)
+          // Last thrown rank for online stick detection on deck draw
           lastThrownRankForStickRef.current = cardsToThrow.length > 0 ? cardsToThrow[cardsToThrow.length - 1].rank : null;
           
           // Create throw animations
@@ -2581,14 +2753,14 @@ export default function GameTableScreen() {
           // Mark that we made a move this turn (prevents Yaniv button from showing)
           hasMadeMoveThisTurnRef.current = true;
           
-          // Store draw source for animation when card arrives (כל משיכה מהערימה = פנים פתוחים)
+          // Draw source for incoming card anim (any pile pick = face up)
           lastDrawSourceRef.current = (source === 'pileFirst' || source === 'pileLast' || source === 'pileIndex' || source === 'pileCardId') ? 'pile' : source;
           isWaitingForNewCardRef.current = true; // Flag that we're expecting a new card
 
           // Send to server (this will trigger immediate gameStateUpdated)
           socketService.throwCards(cardIdsToSend, source, source === 'pileIndex' ? pileIndex : undefined, source === 'pileCardId' ? pileCardId : undefined);
           
-          // שמירת הקלפים שנזרקו לעדכון אופטימיסטי
+          // Thrown cards for optimistic pile update after anim
           const thrownCardsForPile = [...cardsToThrow];
           
           setTimeout(() => {
@@ -2618,7 +2790,7 @@ export default function GameTableScreen() {
       setIsAnimating(true);
       const cardsToThrow = myHand.filter(c => selectedCardIds.includes(c.id));
       
-      // שומרים את הרנק של הקלף שנזרק (לצורך הדבקות)
+      // Thrown rank for offline stick
       const thrownRank = cardsToThrow[cardsToThrow.length - 1].rank;
       setLastDiscardedRank(thrownRank);
       
@@ -2646,40 +2818,40 @@ export default function GameTableScreen() {
          setHiddenCardId(topPileCard.id);
          newCardToAdd = { ...topPileCard, id: `drawn-${Date.now()}` };
       } else {
-         // לוקחים קלף מהחפיסה הראשית
+         // Draw from stock
          if (deckRef.current.length === 0 && discardPile.length > 1) {
-             // החפיסה ריקה - מערבבים את ערימת הזריקה מחדש (פרט לקלף העליון)
+             // Empty stock — reshuffle discard except top card
              const topCard = discardPile[discardPile.length - 1];
              const cardsToReshuffle = discardPile.slice(0, -1);
              deckRef.current = shuffleArray(cardsToReshuffle);
-             setDiscardPile([topCard]); // משאירים רק את הקלף העליון
-             setDeckCount(deckRef.current.length); // מעדכנים אחרי הערבוב
+             setDiscardPile([topCard]); // Leave only visible top
+             setDeckCount(deckRef.current.length); // Refresh count after reshuffle
          }
          
          if (deckRef.current.length > 0) {
              newCardToAdd = deckRef.current[0];
              deckRef.current = deckRef.current.slice(1);
-             setDeckCount(deckRef.current.length); // מעדכנים מיד את התצוגה
+             setDeckCount(deckRef.current.length); // Sync UI immediately
          } else {
-             // fallback אם גם אחרי הערבוב אין קלפים (מצב קיצוני)
+             // Last-resort if still no cards
          newCardToAdd = generateRandomCard();
          }
       }
 
-      // האם יש הזדמנות להדבקה? (רק משיכה מהקופה ורנק זהה למה שנזרק)
+      // Stick offer: deck draw matching thrown rank only
       const willOfferStick = source === 'deck' && allowSticking && newCardToAdd.rank === thrownRank;
 
-      // מסירים את הקלפים שנזרקו מהיד
-      // חשוב: אם יש הדבקה, מוסיפים את הקלף החדש ליד *מיד* כדי שלא ייראה שחסר קלף.
+      // Remove thrown cards from hand
+      // If sticking: add drawn card immediately so hand never looks short
       setMyHand(prev => {
           const handWithoutThrown = prev.filter(c => !selectedCardIds.includes(c.id));
           if (!willOfferStick) return handWithoutThrown;
-          // הוספה מיידית של הקלף שנמשך (כדי לסמן בכחול ולהרים)
+          // Immediate add for blue highlight / raised stick UI
           return sortHand([...handWithoutThrown, newCardToAdd]);
       });
       setSelectedCardIds([]);
 
-      // אם יש הדבקה - מסמנים מיידית ומתחילים חלון 2 שניות (בלי לחכות לסיום האנימציה)
+      // Stick: start 2s window immediately (do not wait for fly anim)
       if (willOfferStick) {
           setStickCardId(newCardToAdd.id);
           if (stickTimerRef.current) clearTimeout(stickTimerRef.current);
@@ -2692,13 +2864,13 @@ export default function GameTableScreen() {
 
       const newAnims: any[] = [];
       
-      // אנימציית זריקה
+      // Throw animations
       cardsToThrow.forEach((c, i) => {
           newAnims.push({ id: `throw-${c.id}`, startPos: HAND_POSITION, endPos: PILE_POSITION, card: c, delay: i * 50 });
       });
 
-      // אנימציית משיכה - רק אם אין הדבקה!
-      // במצב הדבקה הקלף כבר ביד (הוספנו אותו למעלה) ומוצג עם סגנון כחול מורם
+      // Draw anim only when not sticking
+      // Stick path: card already in hand with raised blue styling
       if (!willOfferStick) {
           newAnims.push({
               id: `draw-${newCardToAdd.id}`, startPos: isPileSource ? PILE_POSITION : DECK_POSITION, endPos: HAND_POSITION, card: newCardToAdd, isFaceDown: false, delay: 200
@@ -2731,15 +2903,16 @@ export default function GameTableScreen() {
       }, 1000);
   };
   
-  // === ביצוע הדבקה (לחיצה על הערימה במצב הדבקה) ===
+  // === Perform stick (tap discard while stick active) ===
   const performStick = () => {
+      if (!allowSticking) return;
       if (!stickCardId) return;
       
-      // מוצאים את הקלף להדבקה
+      // Resolve stick target card
       const cardToStick = myHand.find(c => c.id === stickCardId);
       if (!cardToStick) return;
       
-      // מנקים טיימר
+      // Clear stick timer
       if (stickTimerRef.current) {
           clearTimeout(stickTimerRef.current);
           stickTimerRef.current = null;
@@ -2751,16 +2924,16 @@ export default function GameTableScreen() {
           return;
       }
       
-      // === Offline mode - אנימציה מקומית ===
+      // === Offline: local slam anim ===
       const card = { ...cardToStick };
       
-      // מנקים state
+      // Clear stick UI state
       setStickCardId(null);
       
-      // מסירים מהיד
+      // Remove from hand
       setMyHand(prev => prev.filter(c => c.id !== card.id));
       
-      // אנימציית כאפה
+      // Slam animation
       const ts = Date.now();
       const animUp = `slap-up-${ts}`;
       const animSlam = `slap-slam-${ts}`;
@@ -2771,13 +2944,13 @@ export default function GameTableScreen() {
       const UP_TIME = 350;
       const SLAM_TIME = 150;
       
-      // עלייה
+      // Lift phase
       setAnimatingCards(prev => [...prev, { 
           id: animUp, startPos, endPos: highPoint, card, 
           delay: 0, duration: UP_TIME, arcHeight: -50, isSlam: false 
       }]);
       
-      // נפילה
+      // Slam phase
       setTimeout(() => {
           setAnimatingCards(prev => {
               const filtered = prev.filter(a => a.id !== animUp);
@@ -2788,12 +2961,12 @@ export default function GameTableScreen() {
           });
       }, UP_TIME);
       
-      // צליל בנחיתה
+      // SFX on land
       setTimeout(() => {
           if (sfxOn) playStick(true);
       }, UP_TIME + SLAM_TIME);
       
-      // ניקוי ועדכון
+      // Cleanup and commit to pile
       setTimeout(() => {
           setAnimatingCards(prev => prev.filter(a => a.id !== animSlam));
           setDiscardPile(prev => [...prev, card]);
@@ -2803,14 +2976,14 @@ export default function GameTableScreen() {
       }, UP_TIME + SLAM_TIME + 150);
   };
   
-  // === לחיצה על הערימה הפתוחה ===
+  // === Discard pile press ===
   const handlePilePress = (pick: 'first' | 'last' | number | string = 'last') => {
-      // אם יש הדבקה זמינה - לחיצה על הערימה מבצעת הדבקה!
+      // Stick window: pile tap performs stick
       if (stickCardId) {
           performStick();
           return;
       }
-      // אחרת - מהלך רגיל: first/last לרצף, cardId לזוג/שלישייה/רביעייה (הקלף עליו לחצו)
+      // Normal move: first/last for runs; cardId for set groups
       if (typeof pick === 'string' && pick !== 'first' && pick !== 'last') {
           executeMove('pileCardId', undefined, pick);
       } else if (typeof pick === 'number') {
@@ -2845,8 +3018,18 @@ export default function GameTableScreen() {
           </Pressable>
       </View>
 
+      {roundEndPhase === 'flowers' && roundEndCallerId && (() => {
+        const winnerRegion: Region = myPlayer?.id === roundEndCallerId ? 'bottom' : (opponentsWithTurn.find(o => o.id === roundEndCallerId)?.position as Region) || 'top';
+        return <RegionConfettiOverlay key="confetti" region={winnerRegion} />;
+      })()}
+      {roundEndPhase === 'slap' && roundEndType === 'assaf' && roundEndWinnerId && roundEndCallerId && (() => {
+        const originRegion: Region = myPlayer?.id === roundEndWinnerId ? 'bottom' : ((opponentsWithTurn.find(o => o.id === roundEndWinnerId)?.position) as Region) || 'top';
+        const targetRegion: Region = myPlayer?.id === roundEndCallerId ? 'bottom' : ((opponentsWithTurn.find(o => o.id === roundEndCallerId)?.position) as Region) || 'top';
+        return <SlapOverlay key="slap" originRegion={originRegion} targetRegion={targetRegion} />;
+      })()}
+
       {opponentsWithTurn.map((opponent, idx) => {
-          // בדיקה שהשחקן קיים לפני רינדור
+          // Guard before render
           if (!opponent || !opponent.id) {
               return null;
           }
@@ -2858,7 +3041,7 @@ export default function GameTableScreen() {
                   : opponentPosition === 'right'
                   ? styles.posRight
                   : styles.posTop;
-          // חישוב כמות שחקנים כוללת
+          // Total players for layout density
           const playerCount = opponentsWithTurn.length + 1;
           
           return (
@@ -2894,7 +3077,6 @@ export default function GameTableScreen() {
 
       {animatingCards.map(anim => <FlyingCard key={anim.id} {...anim} />)}
 
-      <RoundEndOverlay type={roundEndType} winnerName={roundEndWinner} onComplete={handleRoundEndOverlayComplete} />
 
       {leaveConfirmOpen && (
           <View style={styles.leaveConfirmOverlay}>
@@ -3065,7 +3247,7 @@ export default function GameTableScreen() {
                        handValue={myHandValue}
                        turnSecondsLeft={turnSecondsLeft}
                        turnDurationSeconds={TURN_DURATION_SECONDS}
-                       lastMessage={lastMessageByPlayer[myPlayer.name || ''] || undefined}
+                       lastMessage={lastMessageByPlayer['אתה'] || lastMessageByPlayer[myPlayer.name || ''] || undefined}
                        playerCount={opponentsWithTurn.length + 1}
                    />
                ) : null}
@@ -3077,13 +3259,13 @@ export default function GameTableScreen() {
                    </LinearGradient>
                </Pressable>
            )}
-           {/* אינדיקטור הדבקה - לחץ על הערימה! */}
+           {/* Stick hint — tap the discard pile */}
            {stickCardId && (
                <View style={styles.stickIndicator}>
                    <Text style={styles.stickIndicatorText}>👆 לחץ על הערימה להדבקה!</Text>
                </View>
            )}
-           <View style={styles.handContainer}>
+           <View style={styles.handContainer} pointerEvents={roundEndType ? 'none' : 'auto'}>
                {myHand.map((card, i) => (
                    <PlayerCardView 
                        key={card.id} 
@@ -3108,7 +3290,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, marginTop: 40, zIndex: 50 },
   iconButton: { padding: 10, borderRadius: 50, borderWidth: 2, shadowColor: '#000', shadowOffset: {width:0, height:3}, shadowOpacity:0.3, shadowRadius:4, elevation: 4 },
   
-  // כפתורים בסגנון עץ
+  // Wood-styled header buttons
   woodenIconButton: { 
       borderRadius: 50, 
       overflow: 'hidden',
@@ -3131,7 +3313,7 @@ const styles = StyleSheet.create({
   tableCardSize: { width: TABLE_CARD_WIDTH, height: TABLE_CARD_HEIGHT },
   myCardSize: { width: MY_CARD_WIDTH, height: MY_CARD_HEIGHT },
   
-  // קלפים עם תמונות
+  // Cards using face images
   cardImageContainer: { 
       borderRadius: 10, 
       overflow: 'hidden', 
@@ -3181,7 +3363,7 @@ const styles = StyleSheet.create({
   backLogoText: { fontFamily: Platform.OS === 'ios' ? 'serif' : 'notoserif', fontWeight: '900', color: '#FEF3C7', textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: {width:1, height:1}, textShadowRadius: 3 },
   backSubText: { color: 'rgba(254, 243, 199, 0.8)', fontWeight: 'bold', letterSpacing: 1, fontSize: 8 },
   
-  // === עיצוב קלפים עץ חקוק ===
+  // === Carved wood card chrome ===
   woodenCard: { 
       borderRadius: 12, 
       overflow: 'hidden', 
@@ -3211,11 +3393,11 @@ const styles = StyleSheet.create({
   },
   cardBackImage: { width: '100%', height: '100%', borderRadius: 12 },
   
-  // פסי עץ - טקסטורה
+  // Wood grain stripes
   woodGrainOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   woodGrainLine: { position: 'absolute', top: 0, bottom: 0, width: 1.5, backgroundColor: '#A08060' },
   
-  // פינות קלף עץ
+  // Card corner brackets
   woodenCornerTopLeft: { position: 'absolute', top: 8, left: 10, zIndex: 10 },
   woodenCornerBottomRight: { position: 'absolute', bottom: 8, right: 10, zIndex: 10 },
   woodenRankText: { 
@@ -3226,10 +3408,10 @@ const styles = StyleSheet.create({
       textShadowRadius: 1,
   },
   
-  // סמל באמצע - חקוק
+  // Center suit — engraved look
   woodenCenterContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   
-  // סמלים חקוקים
+  // Corner rank pips
   carvedSuitContainer: { justifyContent: 'center', alignItems: 'center' },
   carvedSuit: { 
       shadowColor: '#5C4A32', 
@@ -3279,7 +3461,7 @@ const styles = StyleSheet.create({
       shadowRadius: 2,
   },
   
-  // תאימות לאחור - סטיילים ישנים
+  // Legacy style aliases
   tropicalCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: {width:0, height:3}, shadowOpacity:0.3, shadowRadius:4, elevation: 5 },
   tropicalCardBg: { flex: 1, borderRadius: 12, padding: 6, position: 'relative' },
   tropicalCornerTopLeft: { position: 'absolute', top: 6, left: 8 },
@@ -3291,7 +3473,7 @@ const styles = StyleSheet.create({
   playerWrapper: { alignItems: 'center', position: 'relative', width: 150 },
   playerWrapperCompact: { width: 130 },
   
-  // סטיילים ליריבים בצדדים (מניפה אנכית)
+  // Side opponents (vertical fan)
   sidePlayerWrapper: { position: 'relative', alignItems: 'center', justifyContent: 'center', height: 180 },
   sidePlayerLeft: { },
   sidePlayerRight: { },
@@ -3300,7 +3482,7 @@ const styles = StyleSheet.create({
   verticalFanContainerSide: { height: 120, width: 60, alignItems: 'center', justifyContent: 'center' },
   sidePlayerInfo: { alignItems: 'center', zIndex: 10 },
   
-  // סגנונות קטנים ליריבי צדדים
+  // Compact chrome for side opponents
   avatarContainerSmall: { marginBottom: 2, alignItems: 'center', justifyContent: 'center', width: 50, height: 50, zIndex: 20 },
   turnRingContainerSmall: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   avatarCircleSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#5C4A32', borderWidth: 2, borderColor: '#8B7355', alignItems: 'center', justifyContent: 'center' },
@@ -3313,10 +3495,10 @@ const styles = StyleSheet.create({
   turnRingContainer: { position: 'absolute', width: TURN_RING_SIZE, height: TURN_RING_SIZE, alignItems: 'center', justifyContent: 'center' },
   playerMessageBubble: { position: 'absolute', top: -36, backgroundColor: 'rgba(17, 24, 39, 0.9)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#374151', maxWidth: 160 },
   playerMessageText: { color: 'white', fontSize: 13, fontWeight: '600' },
-  // הודעות צ'אט ליריבים בצדדים
+  // Chat bubbles beside side seats
   sidePlayerMessageBubble: { position: 'absolute', backgroundColor: 'rgba(17, 24, 39, 0.9)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#374151', maxWidth: 140, zIndex: 50 },
-  sideMessageLeft: { left: 70, top: -20 }, // הודעה מימין לשחקן השמאלי
-  sideMessageRight: { right: 70, top: -20 }, // הודעה משמאל לשחקן הימני
+  sideMessageLeft: { left: 70, top: -20 }, // Bubble to the right of left-seat player
+  sideMessageRight: { right: 70, top: -20 }, // Bubble to the left of right-seat player
   crownBadge: { position: 'absolute', top: -8, right: -5, backgroundColor: '#FBBF24', borderRadius: 12, padding: 3, borderWidth: 2, borderColor: 'white' },
   scoreBadge: { position: 'absolute', bottom: -8, backgroundColor: '#5B8A72', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 2, borderColor: '#3D5E4A' },
   scoreText: { color: '#FFFBF5', fontSize: 12, fontWeight: 'bold' },
@@ -3331,12 +3513,12 @@ const styles = StyleSheet.create({
   opponentFanContainerCompact: { top: 60 },
   miniFanCard: { position: 'absolute' },
   
-  // יריב למעלה - קלפים למעלה, לוגו+שם למטה
+  // Top opponent: fan above, avatar row below
   topOpponentWrapper: { alignItems: 'center', flexDirection: 'column' },
   topOpponentFanContainer: { height: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   topOpponentInfoBelow: { alignItems: 'center' },
   
-  // מיקומי יריבים (מתואמים ל-OPP_TOP_POSITION, OPP_LEFT_POSITION, OPP_RIGHT_POSITION)
+  // Opponent slots (matches OPP_TOP/LEFT/RIGHT)
   posTop: { position: 'absolute', top: 70, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
   posLeft: { position: 'absolute', top: height * 0.21, left: 15, zIndex: 10 },
   posRight: { position: 'absolute', top: height * 0.21, right: 15, zIndex: 10 },
@@ -3383,7 +3565,7 @@ const styles = StyleSheet.create({
   yanivGradient: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 22, borderWidth: 2, borderColor: '#FCD34D' },
   yanivText: { color: 'white', fontWeight: '900', fontSize: 15 },
   
-  // כפתור יניב טרופי
+  // Tropical Yaniv CTA
   tropicalYanivButton: { 
       marginBottom: 10,
       shadowColor: '#5C4A32',
@@ -3409,7 +3591,7 @@ const styles = StyleSheet.create({
   },
   handContainer: { flexDirection: 'row', alignItems: 'flex-end', height: MY_CARD_HEIGHT + 15, paddingHorizontal: 5 },
   
-  // Round end overlay – כמו פופ־אפים אחרים (leaveConfirm, errorCard)
+  // Round end overlay — same pattern as leaveConfirm / errorCard
   roundEndOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', zIndex: 10000 },
   roundEndCard: { width: 300, backgroundColor: '#4B3728', borderRadius: 18, padding: 28, borderWidth: 3, borderColor: '#8B7355', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 14, elevation: 14 },
   roundEndEmoji: { fontSize: 52, marginBottom: 8 },
@@ -3445,7 +3627,7 @@ const styles = StyleSheet.create({
   settingsLabel: { color: '#F5E6D3', fontSize: 15 },
   settingsHint: { color: 'rgba(245, 230, 211, 0.6)', fontSize: 13, marginTop: 16 },
   
-  // Sticking button styles - סגנון טרופי
+  // Sticking CTA — tropical styling
   stickButton: { 
       position: 'absolute', 
       top: TABLE_Y_POS + TABLE_CARD_HEIGHT + 10, 

@@ -3,6 +3,7 @@ import { ArrowRight, Search, Users } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { auth } from '../lib/firebase';
 import { setUserInRoom } from '../lib/userService';
 import { socketService } from '../lib/socketService';
@@ -11,7 +12,7 @@ export default function JoinRoomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string }>();
   const { user, profile } = useAuth();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [roomCode, setRoomCode] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -56,6 +57,9 @@ export default function JoinRoomScreen() {
 
   // Connect to server when screen loads
   useEffect(() => {
+    // Don't auto-rejoin an old room – we're here to enter a new code
+    socketService.abandonReconnection();
+
     const connectWithAuth = async () => {
       if (!socketService.isConnected()) {
         setIsConnecting(true);
@@ -82,6 +86,7 @@ export default function JoinRoomScreen() {
         else if (message === 'Room is full') translatedMessage = t.roomFull;
         else if (message === 'Failed to join room') translatedMessage = 'לא הצלחנו להצטרף לחדר';
         else if (message === 'Not connected to server') translatedMessage = 'לא מחובר לשרת';
+        else if (message === 'Not authenticated. Please reconnect.') translatedMessage = 'לא מאומת. צא מהמסך ונסה להתחבר שוב.';
       }
       Alert.alert(t.error, translatedMessage);
     };
@@ -115,7 +120,7 @@ export default function JoinRoomScreen() {
     }
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!profile) {
       Alert.alert(
         language === 'he' ? 'שגיאה' : 'Error',
@@ -123,45 +128,35 @@ export default function JoinRoomScreen() {
       );
       return;
     }
-    if (roomCode.length !== 6) {
+    const code = String(roomCode || '').trim().replace(/\s/g, '').toUpperCase();
+    if (code.length !== 6) {
       Alert.alert('', t.invalidCode);
       return;
     }
-    
-    // Make sure we're connected before trying to join
+
+    socketService.abandonReconnection();
+
     if (!socketService.isConnected()) {
       setIsConnecting(true);
-      socketService.connect();
-      // Wait a bit for connection then try to join
-      setTimeout(() => {
-        if (socketService.isConnected()) {
-          setIsConnecting(false);
-          setIsJoining(true);
-          socketService.joinRoom(
-            roomCode.toUpperCase(),
-            profile.username,
-            profile.avatar
-          );
-        } else {
-          setIsConnecting(false);
-          Alert.alert(
-            t.error,
-            language === 'he' ? 'לא הצלחנו להתחבר לשרת. נסה שוב.' : 'Could not connect to server. Please try again.'
-          );
-        }
-      }, 2000);
+      const token = await auth.currentUser?.getIdToken();
+      const prevOnConnected = socketService.onConnected;
+      socketService.onConnected = () => {
+        socketService.onConnected = prevOnConnected;
+        if (prevOnConnected) prevOnConnected();
+        setIsConnecting(false);
+        setIsJoining(true);
+        socketService.joinRoom(code, profile.username, profile.avatar);
+      };
+      socketService.connect(token);
       return;
     }
-    
+
     setIsJoining(true);
-    socketService.joinRoom(
-      roomCode.toUpperCase(),
-      profile.username,
-      profile.avatar
-    );
+    socketService.joinRoom(code, profile.username, profile.avatar);
   };
 
-  const isCodeValid = roomCode.length === 6;
+  const normalizedCode = roomCode.trim().replace(/\s/g, '').toUpperCase();
+  const isCodeValid = normalizedCode.length === 6;
 
   return (
     <View style={styles.container}>

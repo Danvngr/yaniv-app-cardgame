@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Trophy, Crown, Medal, Star } from 'lucide-react-native';
+import { useLanguage } from '../context/LanguageContext';
 import { getLeaderboard } from '../lib/userService';
 
 type LeaderboardEntry = {
@@ -15,7 +16,7 @@ type LeaderboardEntry = {
 
 export default function LeaderboardScreen() {
   const router = useRouter();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const isRTL = language === 'he';

@@ -1,13 +1,15 @@
 import { useRouter } from 'expo-router';
 import { BarChart3, Bell, Settings, Trophy, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { subscribeToFriendRequests, subscribeToGameInvites } from '../lib/userService';
+import { useLanguage } from '../context/LanguageContext';
+import { socketService } from '../lib/socketService';
+import { setUserInRoom, subscribeToFriendRequests, subscribeToGameInvites } from '../lib/userService';
 
 const { width, height } = Dimensions.get('window');
 
-// לוגואים לבחירה (נשמר ב-Firebase + AsyncStorage)
+// Avatar options for picker (persisted in Firebase + AsyncStorage)
 const AVATAR_OPTIONS = [
   '👤', '😎', '🦁', '🐯', '🐻', '🐼', '🦊', '🐶', '🐱', '🦄', '🐴', '🐸',
   '🦋', '🐝', '🐙', '🦀', '🐬', '🦈', '🐳', '🦉', '🐲', '🌟', '🔥', '💎',
@@ -17,9 +19,50 @@ const AVATAR_OPTIONS = [
 export default function LobbyScreen() {
   const router = useRouter();
   const { user, profile, updateProfile } = useAuth();
+  const { language } = useLanguage();
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [gameInviteCount, setGameInviteCount] = useState(0);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameSaving, setNameSaving] = useState(false);
+  const isRTL = language === 'he';
+
+  const text = {
+    en: {
+      friends: 'Friends',
+      playerFallback: 'Player',
+      pickAvatar: 'Choose Avatar',
+      changeName: 'Change Name',
+      yourName: 'Your name',
+      cancel: 'Cancel',
+      save: 'Save',
+      createRoom: 'Create Room',
+      joinRoom: 'Join Room',
+      myStats: 'My Stats',
+      leaderboard: 'Leaderboard',
+      error: 'Error',
+      nameTaken: 'This name is already taken',
+      nameChangeFailed: 'Could not change name. Try again.',
+    },
+    he: {
+      friends: 'חברים',
+      playerFallback: 'שחקן',
+      pickAvatar: 'בחר לוגו',
+      changeName: 'שינוי שם',
+      yourName: 'השם שלך',
+      cancel: 'ביטול',
+      save: 'שמור',
+      createRoom: 'פתח חדר',
+      joinRoom: 'הצטרף לחדר',
+      myStats: 'הסטטיסטיקה שלי',
+      leaderboard: 'לוח מובילים',
+      error: 'שגיאה',
+      nameTaken: 'שם זה תפוס',
+      nameChangeFailed: 'לא הצלחנו לשנות שם. נסה שוב.',
+    },
+  };
+  const t = text[language];
   
   const notificationCount = useMemo(() => friendRequestCount + gameInviteCount, [friendRequestCount, gameInviteCount]);
 
@@ -31,6 +74,38 @@ export default function LobbyScreen() {
       console.warn('Failed to save avatar', e);
     }
   };
+
+  const handleOpenNameModal = () => {
+    setNameDraft(profile?.username ?? '');
+    setShowNameModal(true);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed || !profile) return;
+    if (trimmed === profile.username) {
+      setShowNameModal(false);
+      return;
+    }
+    setNameSaving(true);
+    try {
+      await updateProfile({ username: trimmed });
+      setShowNameModal(false);
+    } catch (err: any) {
+      const isTaken = err?.message === 'username-taken';
+      Alert.alert(t.error, isTaken ? t.nameTaken : t.nameChangeFailed);
+    } finally {
+      setNameSaving(false);
+    }
+  };
+
+  // When in lobby and not in a room, reset inRoom so friends see us as available (not gray)
+  useEffect(() => {
+    if (!user) return;
+    if (socketService.getRoom() === null) {
+      setUserInRoom(user.uid, false).catch(() => {});
+    }
+  }, [user]);
 
   // Subscribe to notifications
   useEffect(() => {
@@ -60,13 +135,13 @@ export default function LobbyScreen() {
       />
 
       {/* Top Bar */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         {/* Friends Button - Left */}
         <Pressable
           onPress={() => router.push('/friends-list')}
           style={({pressed}) => [styles.friendsButton, pressed && styles.pressed]}
         >
-          <Text style={styles.friendsButtonText}>חברים</Text>
+          <Text style={styles.friendsButtonText}>{t.friends}</Text>
         </Pressable>
 
         {/* Right Buttons */}
@@ -94,7 +169,7 @@ export default function LobbyScreen() {
         </View>
       </View>
 
-      {/* User profile: logo + name (לחיצה על הלוגו פותחת בחירה) */}
+      {/* User profile: logo + name (tap logo to open picker) */}
       {user && profile && (
         <View style={styles.profileSection}>
           <Pressable
@@ -103,16 +178,21 @@ export default function LobbyScreen() {
           >
             <Text style={styles.profileAvatarText}>{profile.avatar || '?'}</Text>
           </Pressable>
-          <Text style={styles.profileName} numberOfLines={1}>{profile.username || 'שחקן'}</Text>
+          <Pressable
+            onPress={handleOpenNameModal}
+            style={({ pressed }) => [styles.profileNameButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.profileName} numberOfLines={1}>{profile.username || t.playerFallback}</Text>
+          </Pressable>
         </View>
       )}
 
-      {/* מודל בחירת לוגו */}
+      {/* Avatar picker modal */}
       <Modal visible={showAvatarModal} transparent animationType="fade">
         <Pressable style={styles.avatarModalOverlay} onPress={() => setShowAvatarModal(false)}>
           <Pressable style={styles.avatarModalCard} onPress={() => {}}>
             <View style={styles.avatarModalHeader}>
-              <Text style={styles.avatarModalTitle}>בחר לוגו</Text>
+              <Text style={styles.avatarModalTitle}>{t.pickAvatar}</Text>
               <Pressable onPress={() => setShowAvatarModal(false)} style={styles.avatarModalClose}>
                 <X size={20} color="#4B3728" />
               </Pressable>
@@ -138,6 +218,53 @@ export default function LobbyScreen() {
         </Pressable>
       </Modal>
 
+      <Modal visible={showNameModal} transparent animationType="fade">
+        <Pressable
+          style={styles.avatarModalOverlay}
+          onPress={() => !nameSaving && setShowNameModal(false)}
+        >
+          <Pressable style={styles.nameModalCard} onPress={() => {}}>
+            <View style={styles.avatarModalHeader}>
+              <Text style={styles.avatarModalTitle}>{t.changeName}</Text>
+              <Pressable
+                onPress={() => !nameSaving && setShowNameModal(false)}
+                style={styles.avatarModalClose}
+                disabled={nameSaving}
+              >
+                <X size={20} color="#4B3728" />
+              </Pressable>
+            </View>
+            <TextInput
+              style={styles.nameInput}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              placeholder={t.yourName}
+              placeholderTextColor="#8B7355"
+              editable={!nameSaving}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
+            />
+            <View style={styles.nameModalButtons}>
+              <Pressable
+                onPress={() => setShowNameModal(false)}
+                style={[styles.nameModalBtn, styles.nameModalBtnCancel]}
+                disabled={nameSaving}
+              >
+                <Text style={styles.nameModalBtnCancelText}>{t.cancel}</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveName}
+                style={[styles.nameModalBtn, styles.nameModalBtnSave, (nameSaving || !nameDraft.trim()) && styles.nameModalBtnDisabled]}
+                disabled={nameSaving || !nameDraft.trim()}
+              >
+                {nameSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.nameModalBtnSaveText}>{t.save}</Text>}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Main Content */}
       <View style={styles.mainContent}>
         
@@ -146,7 +273,7 @@ export default function LobbyScreen() {
           onPress={() => router.push('/create-room')}
           style={({pressed}) => [styles.mainGameButton, styles.onlineButton, pressed && styles.pressed]}
         >
-          <Text style={styles.mainGameButtonText}>פתח חדר</Text>
+          <Text style={styles.mainGameButtonText}>{t.createRoom}</Text>
         </Pressable>
 
         {/* Join Room Button */}
@@ -154,7 +281,7 @@ export default function LobbyScreen() {
           onPress={() => router.push('/join-room')}
           style={({pressed}) => [styles.mainGameButton, styles.joinRoomButton, pressed && styles.pressed]}
         >
-          <Text style={styles.mainGameButtonText}>הצטרף לחדר</Text>
+          <Text style={styles.mainGameButtonText}>{t.joinRoom}</Text>
         </Pressable>
 
         {/* Bottom Row - Stats & Leaderboard */}
@@ -165,7 +292,7 @@ export default function LobbyScreen() {
             style={({pressed}) => [styles.bottomButton, pressed && styles.pressed]}
           >
             <BarChart3 size={28} color="#FFD700" />
-            <Text style={styles.bottomButtonText}>הסטטיסטיקה שלי</Text>
+            <Text style={styles.bottomButtonText}>{t.myStats}</Text>
           </Pressable>
 
           {/* Leaderboard Button */}
@@ -174,7 +301,7 @@ export default function LobbyScreen() {
             style={({pressed}) => [styles.bottomButton, pressed && styles.pressed]}
           >
             <Trophy size={28} color="#FFD700" />
-            <Text style={styles.bottomButtonText}>לוח מובילים</Text>
+            <Text style={styles.bottomButtonText}>{t.leaderboard}</Text>
           </Pressable>
         </View>
       </View>
@@ -340,6 +467,9 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
+  profileNameButton: {
+    alignItems: 'center',
+  },
   mainGameButtonText: {
     color: '#fff',
     fontSize: 28,
@@ -419,6 +549,15 @@ const styles = StyleSheet.create({
     maxWidth: width * 0.9,
     maxHeight: height * 0.6,
   },
+  nameModalCard: {
+    backgroundColor: '#F5E6D3',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 3,
+    borderColor: '#8B7355',
+    width: '100%',
+    maxWidth: 360,
+  },
   avatarModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -434,6 +573,51 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 20,
     backgroundColor: 'rgba(139, 115, 85, 0.3)',
+  },
+  nameInput: {
+    backgroundColor: '#FFFBF5',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#D4C5B0',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    color: '#4B3728',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  nameModalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  nameModalBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameModalBtnCancel: {
+    backgroundColor: '#EDE3D4',
+    borderColor: '#D4C5B0',
+  },
+  nameModalBtnSave: {
+    backgroundColor: '#5B8A72',
+    borderColor: '#3D5E4A',
+  },
+  nameModalBtnDisabled: {
+    opacity: 0.65,
+  },
+  nameModalBtnCancelText: {
+    color: '#4B3728',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  nameModalBtnSaveText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   avatarGrid: {
     flexDirection: 'row',

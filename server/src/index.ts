@@ -120,7 +120,18 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
       return;
     }
 
-    const room = roomManager.getRoom(code);
+    // Normalize code: must be 6-char string (server stores uppercase)
+    const codeStr = (code != null && typeof code === 'string')
+      ? String(code).trim().replace(/\s/g, '').toUpperCase()
+      : '';
+    if (codeStr.length !== 6) {
+      console.log('[Socket] joinRoom invalid or missing code:', JSON.stringify(code));
+      socket.emit('roomError', { message: 'Room not found' });
+      return;
+    }
+
+    const room = roomManager.getRoom(codeStr);
+    console.log('[Socket] joinRoom attempt code=%s found=%s totalRooms=%d', codeStr, !!room, roomManager.getRoomCount());
 
     if (!room) {
       socket.emit('roomError', { message: 'Room not found' });
@@ -132,7 +143,7 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
       const playerId = room.tryRejoinPlayer(player.name, player.avatar, socket.id);
       
       if (playerId) {
-        console.log(`[Socket] ${player.name} rejoined room ${code}`);
+        console.log(`[Socket] ${player.name} rejoined room ${room.code}`);
         
         // Setup room callbacks if not already
         setupRoomCallbacks(room, socket);

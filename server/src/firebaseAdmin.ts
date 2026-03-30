@@ -2,7 +2,7 @@ import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 const initializeFirebaseAdmin = () => {
-  console.log('[DEBUG] Starting Firebase initialization check...'); // לוג התחלה
+  console.log('[DEBUG] Starting Firebase initialization check...');
 
   if (admin.apps.length > 0) {
     console.log('[DEBUG] Already initialized');
@@ -11,29 +11,29 @@ const initializeFirebaseAdmin = () => {
 
   const secret = process.env.FIREBASE_SERVICE_ACCOUNT;
   
-  // בדיקה 1: האם המשתנה קיים בכלל?
+  // Check 1: is the env var present?
   if (!secret) {
     console.warn('[Firebase Admin] WARNING: No FIREBASE_SERVICE_ACCOUNT env var found.');
     return;
   }
 
-  console.log(`[DEBUG] Found secret string. Length: ${secret.length}`); // בדיקה שהמחרוזת לא ריקה
+  console.log(`[DEBUG] Found secret string. Length: ${secret.length}`);
 
   try {
-    // בדיקה 2: האם הפארס עובד?
+    // Check 2: does JSON parse succeed?
     const serviceAccount = JSON.parse(secret);
     console.log('[DEBUG] JSON parse successful. Project ID:', serviceAccount.project_id);
 
-    // בדיקה 3: האם פיירבייס מצליח לקבל את זה?
+    // Check 3: can Firebase accept the credential?
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
     console.log('[Firebase Admin] Successfully initialized!');
 
   } catch (error: any) {
-    // כאן התיקון הגדול: אנחנו תופסים את השגיאה ולא נותנים לשרת לקרוס!
+    // Catch errors so the process does not crash on bad config
     console.error('CRITICAL ERROR parsing/initializing Firebase:', error.message);
-    // אנחנו לא עושים throw error כדי שהשרת יעלה בכל זאת ונוכל לראות את הלוג
+    // No throw: server can still start and logs remain visible
   }
 };
 
@@ -53,15 +53,3 @@ export const verifyToken = async (token: string): Promise<string | null> => {
     return null;
   }
 };
-
-export const getUser = async (uid: string) => {
-  if (admin.apps.length === 0) return null;
-  try {
-    return await admin.auth().getUser(uid);
-  } catch (error) {
-    console.error('[Firebase Admin] Failed to get user:', error);
-    return null;
-  }
-};
-
-export default admin;

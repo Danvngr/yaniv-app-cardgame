@@ -2,12 +2,13 @@ import { useRouter } from 'expo-router';
 import { ArrowRight, Crown, DoorOpen, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View, Image } from 'react-native';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
 export default function FriendsModeScreen() {
   const router = useRouter();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
 
   const isRTL = language === 'he';
 

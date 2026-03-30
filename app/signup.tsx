@@ -15,13 +15,14 @@ import {
     View,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
 export default function SignupScreen() {
   const router = useRouter();
   const { signUp, updateProfile } = useAuth();
-  const [language, setLanguage] = useState<'en' | 'he'>('he');
+  const { language, setLanguage } = useLanguage();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

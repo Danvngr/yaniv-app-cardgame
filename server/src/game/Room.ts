@@ -24,7 +24,7 @@ import {
   sortHand,
 } from './YanivLogic';
 
-const AI_NAMES = ['בוט רועי', 'בוט דנה', 'בוט יוסי', 'בוט מיכל', 'בוט אבי', 'בוט שירה'];
+const AI_NAMES = ['Sage', 'Lyra', 'Finn', 'Juno', 'Atlas', 'Iris', 'Silas', 'Cora', 'Felix', 'Nova'];
 const AI_AVATARS = ['🤖', '🎮', '🎯', '🎲', '🃏', '🎰'];
 const CARDS_PER_PLAYER = 5;
 const TURN_TIMEOUT_MS = 60000; // 60 seconds
@@ -51,7 +51,6 @@ export class GameRoom {
   public onGameEnded?: (finalScores: { odId: string; name: string; avatar: string; score: number }[]) => void;
   public onStickingAvailable?: (playerId: string, card: Card, timeoutMs: number) => void;
   public onStickingExpired?: (playerId: string) => void;
-  public onAiTurn?: (playerId: string) => void;
   public onAiMove?: (playerId: string, cardsThrown: Card[], drawFrom: 'deck' | 'pile') => void;
   public onPlayerMove?: (playerId: string, cardsThrown: Card[], drawFrom: 'deck' | 'pile' | 'pileFirst' | 'pileLast' | 'pileIndex' | 'pileCardId', drawnCard?: Card) => void;
   public onStickPerformed?: (playerId: string, card: Card) => void;
@@ -109,6 +108,10 @@ export class GameRoom {
     return this.room.lastActivity;
   }
 
+  get createdAt(): number {
+    return this.room.createdAt;
+  }
+
   // === Player Management ===
   addPlayer(odId: string, name: string, avatar: string, isAi: boolean = false): boolean {
     if (this.room.players.length >= 4) return false;
@@ -139,7 +142,8 @@ export class GameRoom {
     
     const usedNames = new Set(this.room.players.map(p => p.name));
     const availableNames = AI_NAMES.filter(n => !usedNames.has(n));
-    const name = availableNames[0] || `AI ${this.room.players.length}`;
+    const namePool = availableNames.length ? availableNames : AI_NAMES;
+    const name = namePool[Math.floor(Math.random() * namePool.length)];
     
     const usedAvatars = new Set(this.room.players.filter(p => p.isAi).map(p => p.avatar));
     const availableAvatars = AI_AVATARS.filter(a => !usedAvatars.has(a));

@@ -4,6 +4,7 @@ import { ArrowRight, Bell, Check, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
     acceptFriendRequest,
     acceptGameInvite,
@@ -34,7 +35,7 @@ type FriendRequest = {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [invites, setInvites] = useState<GameInvite[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);

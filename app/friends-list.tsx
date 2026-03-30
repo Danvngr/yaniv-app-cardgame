@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ArrowRight, UserPlus, Check, X, Copy, Users } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   searchUsersByUsername,
   sendFriendRequest,
@@ -34,7 +35,7 @@ const { width } = Dimensions.get('window');
 export default function FriendsListScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState(false);
   const [searchResults, setSearchResults] = useState<Array<{ uid: string; username: string; avatar: string }>>([]);

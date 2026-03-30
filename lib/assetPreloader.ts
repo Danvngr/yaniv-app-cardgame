@@ -90,8 +90,8 @@ export const preloadAssets = async (
   const total = imageSources.length;
   let loaded = 0;
 
-  // Load images in batches to prevent overwhelming the system
-  const batchSize = 10;
+  // Load images in batches to speed up preload on capable devices
+  const batchSize = 20;
   const batches: (typeof imageSources)[] = [];
   
   for (let i = 0; i < imageSources.length; i += batchSize) {
@@ -114,4 +114,5 @@ export const preloadAssets = async (
 };
 
 // Export for use in other files if needed
-export { CARD_IMAGES, BACKGROUND_IMAGES };
+export { BACKGROUND_IMAGES, CARD_IMAGES };
+

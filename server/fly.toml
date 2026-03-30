@@ -1,4 +1,5 @@
 # fly.toml - Fly.io deployment configuration
+# After first deploy, run: fly scale count 1  (so all clients hit same in-memory rooms)
 
 app = "yaniv-game-server"
 primary_region = "fra"

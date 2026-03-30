@@ -1,8 +1,9 @@
 import { GameRoom } from './Room';
-import { RoomSettings, ClientRoom } from '../types';
+import { RoomSettings } from '../types';
 
 const ROOM_CLEANUP_INTERVAL_MS = 60000; // Check every minute
 const ROOM_INACTIVE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const ROOM_EMPTY_GRACE_MS = 3 * 60 * 1000; // Don't delete empty room for 3 min (guest may join)
 
 export class RoomManager {
   private rooms: Map<string, GameRoom> = new Map();
@@ -23,11 +24,6 @@ export class RoomManager {
       }
     } while (this.rooms.has(code));
     return code;
-  }
-
-  // Check if room code exists
-  roomExists(code: string): boolean {
-    return this.rooms.has(code.toUpperCase());
   }
 
   // Create new room
@@ -69,11 +65,6 @@ export class RoomManager {
     return false;
   }
 
-  // Get all active rooms (for debugging/admin)
-  getAllRooms(): ClientRoom[] {
-    return Array.from(this.rooms.values()).map(room => room.toClientRoom());
-  }
-
   // Get room count
   getRoomCount(): number {
     return this.rooms.size;
@@ -87,11 +78,11 @@ export class RoomManager {
     for (const [code, room] of this.rooms) {
       // Delete if:
       // 1. Room has been inactive for too long
-      // 2. Room is empty (no players)
-      // 3. Room is finished and has been so for a while
+      // 2. Room is empty AND past grace period (so guest has time to join after host creates)
+      const emptyGraceExpired = room.playerCount === 0 && (now - room.createdAt > ROOM_EMPTY_GRACE_MS);
       if (
         now - room.lastActivity > ROOM_INACTIVE_TIMEOUT_MS ||
-        room.playerCount === 0
+        emptyGraceExpired
       ) {
         toDelete.push(code);
       }

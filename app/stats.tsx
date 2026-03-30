@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Image
 import { useRouter } from 'expo-router';
 import { ArrowRight, Trophy, Target, Percent, Zap, TrendingDown, Gamepad2 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getUserProfile, getUserGameHistory, type GameResult } from '../lib/userService';
 import type { Timestamp } from 'firebase/firestore';
 
 export default function StatsScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     gamesPlayed: 0,

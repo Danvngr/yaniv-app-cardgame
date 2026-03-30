@@ -94,6 +94,7 @@ const PlayerResultCard = ({ player, isWinner, index }: { player: PlayerResult; i
     }, []);
 
     const handValue = player.cards.reduce((sum, c) => sum + c.value, 0);
+    const scoreBefore = player.totalScore - player.pointsAdded;
 
     return (
         <Animated.View style={[
@@ -121,9 +122,15 @@ const PlayerResultCard = ({ player, isWinner, index }: { player: PlayerResult; i
                             <Trophy size={16} color="#FBBF24" />
                         </View>
                     )}
-                    <Text style={[styles.totalScore, player.isEliminated && styles.eliminatedScore]}>
-                        {player.totalScore}
-                    </Text>
+                    {player.pointsAdded > 0 ? (
+                        <Text style={[styles.scoreBeforeAfter, player.isEliminated && styles.eliminatedScore]}>
+                            {scoreBefore} → {player.totalScore}
+                        </Text>
+                    ) : (
+                        <Text style={[styles.totalScore, player.isEliminated && styles.eliminatedScore]}>
+                            {player.totalScore}
+                        </Text>
+                    )}
                 </View>
             </View>
             
@@ -333,6 +340,7 @@ const styles = StyleSheet.create({
     pointsAddedText: { fontSize: 18, fontWeight: '700', color: '#EF4444' },
     winnerBadge: { backgroundColor: 'rgba(251, 191, 36, 0.2)', padding: 6, borderRadius: 12 },
     totalScore: { fontSize: 24, fontWeight: '900', color: 'white' },
+    scoreBeforeAfter: { fontSize: 20, fontWeight: '800', color: 'white' },
     eliminatedScore: { color: '#EF4444', textDecorationLine: 'line-through' },
 
     cardsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
