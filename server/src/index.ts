@@ -16,8 +16,13 @@ import {
 const app = express();
 const httpServer = createServer(app);
 
-// CORS configuration
+// CORS configuration — defaults to '*' in dev, lock down in production via env var
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['*'];
+
+const corsOptions: cors.CorsOptions = {
+  origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
+  methods: ['GET'],
+};
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: {
@@ -28,8 +33,40 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   pingInterval: 25000,
 });
 
-app.use(cors());
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10kb' }));
+
+// ── Input helpers ──────────────────────────────────────────────────────────
+
+const MAX_NAME_LEN = 30;
+
+function sanitizeName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim().slice(0, MAX_NAME_LEN);
+  if (trimmed.length === 0) return null;
+  return trimmed;
+}
+
+// ── Rate limiting (per socket, in-memory) ─────────────────────────────────
+
+const RATE_WINDOWS: Record<string, { count: number; reset: number }> = {};
+const RATE_LIMIT = 60;        // max events per window
+const RATE_WINDOW_MS = 10000; // 10-second window
+
+function isRateLimited(socketId: string): boolean {
+  const now = Date.now();
+  const entry = RATE_WINDOWS[socketId];
+  if (!entry || now > entry.reset) {
+    RATE_WINDOWS[socketId] = { count: 1, reset: now + RATE_WINDOW_MS };
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
+
+function clearRateLimit(socketId: string): void {
+  delete RATE_WINDOWS[socketId];
+}
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -50,6 +87,15 @@ const requireAuth = !!process.env.FIREBASE_SERVICE_ACCOUNT;
 
 io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
   console.log(`[Socket] Connected: ${socket.id}`);
+
+  // Apply rate limiting to every incoming event
+  socket.onAny(() => {
+    if (isRateLimited(socket.id)) {
+      console.warn(`[Socket] Rate limited: ${socket.id}`);
+      socket.emit('roomError', { message: 'Too many requests. Slow down.' });
+      socket.disconnect(true);
+    }
+  });
 
   // === Authentication ===
   socket.on('authenticate', async ({ token }) => {
@@ -83,12 +129,18 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
       return;
     }
 
+    const cleanName = sanitizeName(player?.name);
+    if (!cleanName) {
+      socket.emit('roomError', { message: 'Invalid player name.' });
+      return;
+    }
+
     const playerId = userId || `player-${socket.id}`;
 
     const room = roomManager.createRoom(
       playerId,
-      player.name,
-      player.avatar,
+      cleanName,
+      typeof player?.avatar === 'string' ? player.avatar.slice(0, 10) : '👤',
       settings
     );
 
@@ -120,6 +172,12 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
       return;
     }
 
+    const cleanName = sanitizeName(player?.name);
+    if (!cleanName) {
+      socket.emit('roomError', { message: 'Invalid player name.' });
+      return;
+    }
+
     // Normalize code: must be 6-char string (server stores uppercase)
     const codeStr = (code != null && typeof code === 'string')
       ? String(code).trim().replace(/\s/g, '').toUpperCase()
@@ -139,8 +197,9 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     }
 
     // Check if this is a rejoin attempt (player with same name disconnected)
-    if (room.canPlayerRejoin(player.name)) {
-      const playerId = room.tryRejoinPlayer(player.name, player.avatar, socket.id);
+    if (room.canPlayerRejoin(cleanName)) {
+      const cleanAvatar = typeof player?.avatar === 'string' ? player.avatar.slice(0, 10) : '👤';
+      const playerId = room.tryRejoinPlayer(cleanName, cleanAvatar, socket.id);
       
       if (playerId) {
         console.log(`[Socket] ${player.name} rejoined room ${room.code}`);
@@ -178,7 +237,8 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     }
 
     const playerId = userId || `player-${socket.id}`;
-    const success = room.addPlayer(playerId, player.name, player.avatar, false);
+    const cleanAvatar = typeof player?.avatar === 'string' ? player.avatar.slice(0, 10) : '👤';
+    const success = room.addPlayer(playerId, cleanName, cleanAvatar, false);
 
     if (!success) {
       socket.emit('roomError', { message: 'Failed to join room' });
@@ -358,6 +418,7 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
 
   socket.on('disconnect', () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
+    clearRateLimit(socket.id);
     handlePlayerLeave(socket);
   });
 });
