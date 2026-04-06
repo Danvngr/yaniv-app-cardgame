@@ -209,6 +209,7 @@ export default function RoundSummaryScreen() {
     const handleContinue = useCallback(() => {
         if (hasNavigatedRef.current) return;
         hasNavigatedRef.current = true;
+        const isOnline = (params.isOnline as string | undefined) === 'true';
         if (gameOver) {
             // Navigate to game-over screen with final standings
             const finalPlayers = sortedPlayers.map(p => ({
@@ -230,18 +231,34 @@ export default function RoundSummaryScreen() {
                 }
             });
         } else {
-            // Online mode - just go back to game table (server will send next round state)
-            router.replace({
-                pathname: '/game-table',
-                params: {
-                    roomCode: params.roomCode as string | undefined,
-                    scoreLimit: params.scoreLimit as string | undefined,
-                    allowSticking: params.allowSticking as string | undefined,
-                    isOnline: 'true'
-                }
-            });
+            if (isOnline) {
+                // Online mode: server owns turn order and round state
+                router.replace({
+                    pathname: '/game-table',
+                    params: {
+                        roomCode: params.roomCode as string | undefined,
+                        scoreLimit: params.scoreLimit as string | undefined,
+                        allowSticking: params.allowSticking as string | undefined,
+                        isOnline: 'true'
+                    }
+                });
+            } else {
+                // Offline mode: pass previous winner so winner starts next round
+                router.replace({
+                    pathname: '/game-table',
+                    params: {
+                        roomName: params.roomName as string | undefined,
+                        scoreLimit: params.scoreLimit as string | undefined,
+                        allowSticking: params.allowSticking as string | undefined,
+                        players: params.players as string | undefined,
+                        isOnline: 'false',
+                        prevWinnerId: roundResult.winner.id,
+                        roundId: `${Date.now()}`
+                    }
+                });
+            }
         }
-    }, [gameOver, sortedPlayers, params, router]);
+    }, [gameOver, sortedPlayers, params, router, roundResult.winner.id]);
 
     useEffect(() => {
         if (gameOver || autoAdvanced || hasNavigatedRef.current) return;

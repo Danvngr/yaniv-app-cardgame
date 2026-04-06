@@ -1032,100 +1032,112 @@ const RegionConfettiOverlay = ({ region }: { region: Region }) => {
   );
 };
 
-const SLAP_HAND_SIZE = Math.min(width, height) * 0.45;
+const SLAP_HAND_WIDTH = Math.min(width, height) * 0.36;
+const SLAP_HAND_HEIGHT = SLAP_HAND_WIDTH * 1.2;
 
 const SlapOverlay = ({ originRegion, targetRegion }: { originRegion: Region; targetRegion: Region }) => {
   const origin = REGION_CENTERS[originRegion];
   const target = REGION_CENTERS[targetRegion];
 
-  // Raise hand above origin
-  const raiseX = 0;
-  const raiseY = -60;
-  // Move to point above target (wind-up)
+  const windupX = (target.x - origin.x) * 0.18;
+  const windupY = -72;
   const aboveTargetX = target.x - origin.x;
-  const aboveTargetY = target.y - origin.y - 80;
-  // Land — slap on target
+  const aboveTargetY = target.y - origin.y - 90;
   const slapX = target.x - origin.x;
   const slapY = target.y - origin.y;
-  // Overshoot past target (recoil from impact)
-  const overshootX = slapX + (slapX - raiseX) * 0.06;
-  const overshootY = slapY + 18;
+  const overshootX = slapX + (slapX - windupX) * 0.06;
+  const overshootY = slapY + 22;
 
   const moveX = useRef(new Animated.Value(0)).current;
   const moveY = useRef(new Animated.Value(0)).current;
   const handRotate = useRef(new Animated.Value(0)).current;
-  const handScale = useRef(new Animated.Value(0.5)).current;
+  const handScale = useRef(new Animated.Value(0.62)).current;
   const handOpacity = useRef(new Animated.Value(0)).current;
   const shakeX = useRef(new Animated.Value(0)).current;
+  const impactFlash = useRef(new Animated.Value(0)).current;
+  const impactPulse = useRef(new Animated.Value(0.6)).current;
+  const impactOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     moveX.setValue(0);
     moveY.setValue(0);
     handRotate.setValue(0);
-    handScale.setValue(0.5);
+    handScale.setValue(0.62);
     handOpacity.setValue(0);
     shakeX.setValue(0);
+    impactFlash.setValue(0);
+    impactPulse.setValue(0.6);
+    impactOpacity.setValue(0);
 
     Animated.sequence([
-      // Phase 1: appear + raise hand (200ms)
       Animated.parallel([
-        Animated.timing(handOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
-        Animated.timing(handScale, { toValue: 1.15, duration: 200, useNativeDriver: true }),
-        Animated.timing(moveX, { toValue: raiseX, duration: 200, useNativeDriver: true }),
-        Animated.timing(moveY, { toValue: raiseY, duration: 200, useNativeDriver: true }),
-        Animated.timing(handRotate, { toValue: -15, duration: 200, useNativeDriver: true }),
+        Animated.timing(handOpacity, { toValue: 1, duration: 130, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(handScale, { toValue: 1.14, duration: 220, easing: Easing.out(Easing.back(1.4)), useNativeDriver: true }),
+        Animated.timing(moveX, { toValue: windupX, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: windupY, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(handRotate, { toValue: -22, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]),
-      // Phase 2: move in air to above target (300ms)
       Animated.parallel([
-        Animated.timing(moveX, { toValue: aboveTargetX, duration: 300, useNativeDriver: true }),
-        Animated.timing(moveY, { toValue: aboveTargetY, duration: 300, useNativeDriver: true }),
-        Animated.timing(handRotate, { toValue: 25, duration: 300, useNativeDriver: true }),
-        Animated.timing(handScale, { toValue: 1.3, duration: 300, useNativeDriver: true }),
+        Animated.timing(moveX, { toValue: aboveTargetX, duration: 260, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: aboveTargetY, duration: 260, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(handRotate, { toValue: 34, duration: 260, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(handScale, { toValue: 1.3, duration: 260, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
       ]),
-      // Phase 3: slam down — fast (100ms)
       Animated.parallel([
-        Animated.timing(moveX, { toValue: slapX, duration: 100, useNativeDriver: true }),
-        Animated.timing(moveY, { toValue: slapY, duration: 100, useNativeDriver: true }),
-        Animated.timing(handRotate, { toValue: -5, duration: 100, useNativeDriver: true }),
-        Animated.timing(handScale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
+        Animated.timing(moveX, { toValue: slapX, duration: 95, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: slapY, duration: 95, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(handRotate, { toValue: -8, duration: 95, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(handScale, { toValue: 0.98, duration: 95, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
       ]),
-      // Phase 4: overshoot + bounce
       Animated.parallel([
-        Animated.timing(moveX, { toValue: overshootX, duration: 60, useNativeDriver: true }),
-        Animated.timing(moveY, { toValue: overshootY, duration: 60, useNativeDriver: true }),
+        Animated.timing(moveX, { toValue: overshootX, duration: 65, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: overshootY, duration: 65, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]),
-      // Shake — face wobble from impact
       Animated.sequence([
-        Animated.timing(shakeX, { toValue: 12, duration: 40, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: -10, duration: 40, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: 8, duration: 35, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: -5, duration: 35, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 13, duration: 38, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -10, duration: 38, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 8, duration: 32, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -5, duration: 32, useNativeDriver: true }),
         Animated.timing(shakeX, { toValue: 0, duration: 30, useNativeDriver: true }),
       ]),
-      // Return to target
       Animated.parallel([
-        Animated.timing(moveX, { toValue: slapX, duration: 80, useNativeDriver: true }),
-        Animated.timing(moveY, { toValue: slapY, duration: 80, useNativeDriver: true }),
+        Animated.timing(moveX, { toValue: slapX, duration: 75, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(moveY, { toValue: slapY, duration: 75, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]),
-      // Hold on target
-      Animated.delay(350),
-      // Fade out
-      Animated.timing(handOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => {
-      // Device haptic
-      try { Vibration.vibrate(50); } catch (_) {}
-    });
+      Animated.delay(280),
+      Animated.timing(handOpacity, { toValue: 0, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
 
-    // Haptic at impact (~600ms)
+    // Impact flash + pulse right when the hand lands.
+    Animated.sequence([
+      Animated.delay(480),
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(impactFlash, { toValue: 0.45, duration: 60, useNativeDriver: true }),
+          Animated.timing(impactFlash, { toValue: 0, duration: 170, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(impactOpacity, { toValue: 0.65, duration: 70, useNativeDriver: true }),
+          Animated.timing(impactOpacity, { toValue: 0, duration: 210, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(impactPulse, { toValue: 1.25, duration: 95, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(impactPulse, { toValue: 1.0, duration: 140, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ]),
+      ]),
+    ]).start();
+
     const vibrateTimer = setTimeout(() => {
       try { Vibration.vibrate(50); } catch (_) {}
-    }, 600);
+    }, 500);
 
     return () => {
       clearTimeout(vibrateTimer);
       moveX.setValue(0);
       moveY.setValue(0);
       handOpacity.setValue(0);
+      impactFlash.setValue(0);
+      impactOpacity.setValue(0);
     };
   }, [originRegion, targetRegion]);
 
@@ -1133,13 +1145,44 @@ const SlapOverlay = ({ originRegion, targetRegion }: { originRegion: Region; tar
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 55 }]}>
-      <Animated.Text
+      <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: origin.x - SLAP_HAND_SIZE / 2,
-          top: origin.y - SLAP_HAND_SIZE / 2,
-          fontSize: SLAP_HAND_SIZE,
+          left: target.x - 80,
+          top: target.y - 80,
+          width: 160,
+          height: 160,
+          borderRadius: 80,
+          backgroundColor: '#FFFFFF',
+          opacity: impactFlash,
+        }}
+      />
+
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: target.x - 70,
+          top: target.y - 70,
+          width: 140,
+          height: 140,
+          borderRadius: 70,
+          borderWidth: 4,
+          borderColor: '#FCA5A5',
+          opacity: impactOpacity,
+          transform: [{ scale: impactPulse }],
+        }}
+      />
+
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: origin.x - SLAP_HAND_WIDTH * 0.55,
+          top: origin.y - SLAP_HAND_HEIGHT * 0.75,
+          width: SLAP_HAND_WIDTH,
+          height: SLAP_HAND_HEIGHT,
           opacity: handOpacity,
           transform: [
             { translateX: Animated.add(moveX, shakeX) },
@@ -1149,8 +1192,62 @@ const SlapOverlay = ({ originRegion, targetRegion }: { originRegion: Region; tar
           ],
         }}
       >
-        🖐️
-      </Animated.Text>
+        <View style={{ position: 'absolute', left: 0, top: 52, width: 58, height: 88, borderRadius: 28, backgroundColor: '#D79266' }} />
+        <LinearGradient
+          colors={['#FFD6B0', '#F6BF93', '#E9A577']}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={{
+            position: 'absolute',
+            left: 28,
+            top: 48,
+            width: SLAP_HAND_WIDTH - 32,
+            height: SLAP_HAND_HEIGHT - 62,
+            borderRadius: 44,
+            borderWidth: 2,
+            borderColor: '#D48D62',
+          }}
+        />
+
+        {[0, 1, 2, 3].map((i) => (
+          <LinearGradient
+            key={i}
+            colors={['#FFD6B0', '#F4BA8B']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 34 + i * ((SLAP_HAND_WIDTH - 62) / 4),
+              width: (SLAP_HAND_WIDTH - 78) / 4,
+              height: SLAP_HAND_HEIGHT * (0.45 - i * 0.02),
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              borderBottomLeftRadius: 16,
+              borderBottomRightRadius: 16,
+              borderWidth: 2,
+              borderColor: '#D48D62',
+            }}
+          />
+        ))}
+
+        <LinearGradient
+          colors={['#FFDAB7', '#F2B786']}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
+          style={{
+            position: 'absolute',
+            left: 6,
+            top: 70,
+            width: SLAP_HAND_WIDTH * 0.33,
+            height: SLAP_HAND_HEIGHT * 0.26,
+            borderRadius: 24,
+            transform: [{ rotate: '-28deg' }],
+            borderWidth: 2,
+            borderColor: '#D48D62',
+          }}
+        />
+      </Animated.View>
     </View>
   );
 };

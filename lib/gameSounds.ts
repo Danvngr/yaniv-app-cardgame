@@ -9,23 +9,29 @@ let flickSound: Audio.Sound | null = null;
 export async function loadGameSounds(): Promise<void> {
   try {
     await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false,
+      // Keep SFX audible on iOS even when hardware mute switch is on.
+      playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
       playThroughEarpieceAndroid: false,
     });
-    const [y, a, s, p, f] = await Promise.all([
-      Audio.Sound.createAsync(require('../assets/sounds/yaniv.wav')),
-      Audio.Sound.createAsync(require('../assets/sounds/assaf.wav')),
-      Audio.Sound.createAsync(require('../assets/sounds/stick.wav')),
-      Audio.Sound.createAsync(require('../assets/sounds/pick.mp3')),
-      Audio.Sound.createAsync(require('../assets/sounds/flick.mp3')),
-    ]);
-    yanivSound = y.sound;
-    assafSound = a.sound;
-    stickSound = s.sound;
-    pickSound = p.sound;
-    flickSound = f.sound;
+
+    const loadOne = async (label: string, asset: number): Promise<Audio.Sound | null> => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(asset);
+        return sound;
+      } catch (err) {
+        console.warn(`[SFX] Failed to load ${label}:`, err);
+        return null;
+      }
+    };
+
+    // Load each SFX independently so one missing file does not disable all sounds.
+    yanivSound = await loadOne('yaniv.wav', require('../assets/sounds/yaniv.wav'));
+    assafSound = await loadOne('assaf.wav', require('../assets/sounds/assaf.wav'));
+    stickSound = await loadOne('stick.wav', require('../assets/sounds/stick.wav'));
+    pickSound = await loadOne('pick.mp3', require('../assets/sounds/pick.mp3'));
+    flickSound = await loadOne('flick.mp3', require('../assets/sounds/flick.mp3'));
   } catch (e) {
     console.warn('Failed to load game sounds:', e);
   }
